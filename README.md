@@ -2,7 +2,7 @@
 
 **Course:** COMPSCI 426  
 
-**Team:** , Benson Zheng, Helektra Katsoulakis, Julia Farber, Katelyn Leung, Maria Mechery, Tien Nguyen, Vincent Babu 
+**Team:** Benson Zheng, Helektra Katsoulakis, Julia Farber, Katelyn Leung, Maria Mechery, Tien Nguyen, Vincent Babu 
 
 **System:** Event Ticketing Platform
 
@@ -12,11 +12,15 @@
 
 ## Team and Service Ownership
 
-| Team Member | Services / Components Owned                            |
-| ----------- | ------------------------------------------------------ |
-| [Name]      | [e.g. `order-service/`, `order-service/db/schema.sql`] |
-| [Name]      | [e.g. `restaurant-service/`, `redis/menu-cache`]       |
-| [Name]      | [e.g. `dispatch-worker/`, `k6/`]                       |
+| Team Member | Files / Directories Owned This Sprint           |
+| ----------- | ----------------------------------------------- |
+| Benson Zheng          | event catalog service                 |
+| Helektra Katsoulakis  | analytics worker + analytics db       |
+| Julia Farber          | purchase db + payment service         |
+| Katelyn Leung         | events db + notif. service            |
+| Maria Mechery         | waitlist worker                       |
+| Tien Nguyen           | ticket purchase service               |
+| Vincent Babu          | k6 testing + Caddy; initial skeleton  |
 
 > Ownership is verified by `git log --author`. Each person must have meaningful commits in the directories they claim.
 
@@ -73,7 +77,7 @@ Include which service calls which, what queues exist, and how data flows.]
 
 ---
 
-### [Service Name]
+### Event Ticketing Platform
 
 ### GET /health
 

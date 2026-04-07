@@ -1,4 +1,4 @@
-# Sprint 1 Plan — [Team Name]
+# Sprint 1 Plan — [Team 3]
 
 **Sprint:** 1 — Foundation  
 **Dates:** 04.07 → 04.14  
@@ -8,17 +8,22 @@
 
 ## Goal
 
-[One or two sentences on what your team will have working by end of sprint. Be specific. "Order service, restaurant service, and synchronous call between them running in Docker Compose with health endpoints" is good. "Get stuff working" is not.]
+Event Catalog Service, Ticket Purchase Service, Payment Service, all start via compose.yml along with their associated Postgres databases. The Redis service starts, and a synchronous HTTP call from Ticket Purchase Service to Payment Service can be performed.
 
 ---
 
 ## Ownership
 
-| Team Member | Files / Directories Owned This Sprint           |
-| ----------- | ----------------------------------------------- |
-| [Name]      | `[service-dir]/`, `[service-dir]/db/schema.sql` |
-| [Name]      | `[service-dir]/`, `compose.yml` additions       |
-| [Name]      | `k6/sprint-1.js`, `[worker-dir]/`               |
+| Team Member           | Files / Directories Owned This Sprint                  |
+| --------------------- | -----------------------------------------------------  |
+| Benson Zheng          | `C-event-catalog/service.js`                           |
+| Helektra Katsoulakis  | `C-analytics/worker.js`, `DB-analytics.sql`,           |
+| Julia Farber          | `DB-purchase.sql`, `C-payment/service.js`              |
+| Katelyn Leung         | `DB-events.sql`, `C-ticket-purchase/notif-service.js`, |
+|                       | `C-ticket-purchase/notif-worker.js`                          |
+| Maria Mechery         | `C-payment/waitlist.js`                                |
+| Tien Nguyen           | `C-ticket-purchase/service.js`, `README.md`            |
+| Vincent Babu          | `k6/sprint-1.js`, `Caddyfile`, `README.md`             |
 
 Each person must have meaningful commits in the paths they claim. Ownership is verified by:
 
@@ -30,31 +35,62 @@ git log --author="Name" --oneline -- path/to/directory/
 
 ## Tasks
 
-### [Name]
+### Benson Zheng
 
-- [ ] Set up `[service]/` with Express + Postgres connection
-- [ ] Implement `GET /health` with DB check
-- [ ] Write `db/schema.sql` and seed script
-- [ ] Add `healthcheck` directive to `compose.yml`
+- [ ] Set up `C-event-catalog/` with Express and Postgres connection
+- [ ] Implement `GET /health` with DB check for event service
+- [ ] Add `healthcheck` directive to `compose.yml` for event service
 
-### [Name]
+### Helektra Katsoulakis
 
-- [ ] Set up `[service]/` with Express + Redis connection
-- [ ] Implement `GET /health` with Redis check
+- [ ] Write `DB-analytics.sql` and seed script
+- [ ] Set up `C-analytics/` with Express and Postgres connection
+- [ ] Implement `GET /health` with Redis check and DB check for analytics worker
+- [ ] Implement `GET /analytics` — stub returning placeholder data
+
+### Julia Farber
+
+- [ ] Set up `C-payment/` with Express
+- [ ] Write `DB-purchase.sql` and seed script
+- [ ] Implement `GET /health` with Redis check for payment service
+- [ ] Implement reception of `POST /process-purchase-payment` return from ticketing request service
+- [ ] Add healthcheck directive to compose.yml for payment service
+
+### Katelyn Leung
+
+- [ ] Write `DB-events.sql` and seed script
+- [ ] Set up `C-ticket-purchase/notif-service.js` dependent on notif. worker health
+- [ ] Set up `C-ticket-purchase/notif-worker.js` worker stub with Redis check
+- [ ] Implement `GET /health` with Redis check for notif. service
+- [ ] Implement `GET /health` with Redis check for notif. worker
+
+### Maria Mechery
+
+- [ ] Set up `C-payment/waitlist.js` worker
+- [ ] Implement `GET /health` with Redis check for user-waitlist worker
+- [ ] Add healthcheck directive to compose.yml for user-waitlist worker
+
+### Tien Nguyen
+
+- [ ] Set up `C-ticket-purchase/` with Express and Postgres connection
+- [ ] Implement `GET /health` with Redis check for primary ticket purchase service
 - [ ] Implement `GET /[resource]` — stub returning placeholder data
-- [ ] Test synchronous call to [other service]
+- [ ] send `POST /process-purchase-payment` synchronous HTTP call to payment service
 
-### [Name]
+
+### Vincent Babu
 
 - [ ] Wire `depends_on: condition: service_healthy` in `compose.yml`
 - [ ] Write `k6/sprint-1.js` baseline load test
-- [ ] Write `README.md` startup instructions and endpoint list
-
+- [ ] Test synchronous call from Ticket Purchase to Payment 
+- [X] Write `README.md` startup instructions and endpoint list
+- [X] Write `SPRINT-1-PLAN.md` information and work breakdown
+- [X] Write `Caddyfile` stub
 ---
 
 ## Risks
 
-[What could go wrong? What are you uncertain about? What will you do if a task takes longer than expected?]
+If a task takes longer than expected, we must contact the group as soon as we know we need help. In a project like this, almost every service depends on every other service in some small way, so every group member is depended upon. 
 
 ---
 

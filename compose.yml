@@ -111,6 +111,15 @@ services:
   #     timeout: 3s
   #     retries: 5
 
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - holmes
+      #TODO: change this to all the services that need distributing
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
 # ── Named volumes ──────────────────────────────────────────────────────────────
 # Declare a volume for each database here, e.g.:
 #
