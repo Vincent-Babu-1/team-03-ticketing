@@ -1,9 +1,12 @@
-# [Team Name] — [System Name]
+# Team 3  — Event Ticketing Platform
 
 **Course:** COMPSCI 426  
-**Team:** [Name], [Name], [Name], ...  
-**System:** [e.g. Event Ticketing / Food Delivery / Video Platform / ...]  
-**Repository:** [GitHub URL — public fork of https://github.com/umass-cs-426/starter-project]
+
+**Team:** , Benson Zheng, Helektra Katsoulakis, Julia Farber, Katelyn Leung, Maria Mechery, Tien Nguyen, Vincent Babu 
+
+**System:** Event Ticketing Platform
+
+**Repository:** https://github.com/Vincent-Babu-1/team-03-ticketing
 
 ---
 
