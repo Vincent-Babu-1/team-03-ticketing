@@ -16,14 +16,15 @@ Event Catalog Service, Ticket Purchase Service, Payment Service, all start via c
 
 | Team Member           | Files / Directories Owned This Sprint                  |
 | --------------------- | -----------------------------------------------------  |
-| Benson Zheng          | `C-event-catalog/service.js`                           |
-| Helektra Katsoulakis  | `C-analytics/worker.js`, `DB-analytics.sql`,           |
-| Julia Farber          | `DB-purchase.sql`, `C-payment/service.js`              |
-| Katelyn Leung         | `DB-events.sql`, `C-ticket-purchase/notif-service.js`, |
-|                       | `C-ticket-purchase/notif-worker.js`                    |
-| Maria Mechery         | `C-payment/waitlist.js`                                |
-| Tien Nguyen           | `C-ticket-purchase/service.js`, `README.md`            |
-| Vincent Babu          | `k6/sprint-1.js`, `Caddyfile`, `README.md`             |
+| Benson Zheng          | `C-event-catalog/service.js`                                     |
+| Helektra Katsoulakis  | `C-analytics/worker.js`, `DB-folder/DB-analytics.sql`            |
+| Julia Farber          | `DB-folder/DB-purchase.sql`, `C-payment/service.js`              |
+| Katelyn Leung         | `DB-folder/DB-events.sql`, `C-ticket-purchase/notif-service.js`  |
+| Maria Mechery         | `C-payment/waitlist.js`, `C-ticket-purchase/service.js`          |
+| Tien Nguyen           | `C-fraud/worker.js`, `DB-folder/DB-fraud.sql`                    |
+| Vincent Babu          | `k6/sprint-1.js`, `Caddyfile`, `README.md`,                      |
+|                       | `DB-folder/DB-refund.sql`, `C-refund/service.js`                 |
+| Ri Lu                 | `C-ticket-purchase/notif-worker.js`                              |
 
 Each person must have meaningful commits in the paths they claim. Ownership is verified by:
 
@@ -60,19 +61,17 @@ git log --author="Name" --oneline -- path/to/directory/
 
 - [ ] Write `DB-events.sql` and seed script
 - [ ] Set up `C-ticket-purchase/notif-service.js` dependent on notif. worker health
-- [ ] Set up `C-ticket-purchase/notif-worker.js` worker stub with Redis check
 - [ ] Implement `GET /health` with Redis check for notif. service
-- [ ] Implement `GET /health` with Redis check for notif. worker
 
 ### Maria Mechery
 
+- [ ] Set up `C-ticket-purchase/` with Express and Postgres connection
 - [ ] Set up `C-payment/waitlist.js` worker
 - [ ] Implement `GET /health` with Redis check for user-waitlist worker
 - [ ] Add healthcheck directive to compose.yml for user-waitlist worker
 
 ### Tien Nguyen
 
-- [ ] Set up `C-ticket-purchase/` with Express and Postgres connection
 - [ ] Implement `GET /health` with Redis check for primary ticket purchase service
 - [ ] Implement `GET /[resource]` — stub returning placeholder data
 - [ ] send `POST /process-purchase-payment` synchronous HTTP call to payment service
@@ -86,11 +85,18 @@ git log --author="Name" --oneline -- path/to/directory/
 - [X] Write `README.md` startup instructions and endpoint list
 - [X] Write `SPRINT-1-PLAN.md` information and work breakdown
 - [X] Write `Caddyfile` stub
+
+### Ri Lu
+
+- [ ] Set up `C-ticket-purchase/notif-worker.js` worker stub with Redis check
+- [ ] Implement `GET /health` with Redis check for notif. worker
+- [ ] Plan locations for various Redis publish/subscribe events
+
 ---
 
 ## Risks
 
-If a task takes longer than expected, we must contact the group as soon as we know we need help. In a project like this, almost every service depends on every other service in some small way, so every group member is depended upon. 
+If a task takes longer than expected, we must contact the group as soon as we know we need help. In a project like this, almost every service depends on every other service in some small way, so every group member is depended upon. We currently plan to check in on Sunday to see if anyone needs extra help.
 
 ---
 
