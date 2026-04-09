@@ -20,7 +20,7 @@ Event Catalog Service, Ticket Purchase Service, Payment Service, all start via c
 | Helektra Katsoulakis  | `C-analytics/worker.js`, `DB-analytics.sql`,           |
 | Julia Farber          | `DB-purchase.sql`, `C-payment/service.js`              |
 | Katelyn Leung         | `DB-events.sql`, `C-ticket-purchase/notif-service.js`, |
-|                       | `C-ticket-purchase/notif-worker.js`                          |
+|                       | `C-ticket-purchase/notif-worker.js`                    |
 | Maria Mechery         | `C-payment/waitlist.js`                                |
 | Tien Nguyen           | `C-ticket-purchase/service.js`, `README.md`            |
 | Vincent Babu          | `k6/sprint-1.js`, `Caddyfile`, `README.md`             |
