@@ -12,15 +12,16 @@
 
 ## Team and Service Ownership
 
-| Team Member | Files / Directories Owned This Sprint           |
-| ----------- | ----------------------------------------------- |
-| Benson Zheng          | event catalog service                 |
-| Helektra Katsoulakis  | analytics worker + analytics db       |
-| Julia Farber          | purchase db + payment service         |
-| Katelyn Leung         | events db + notif. service            |
-| Maria Mechery         | waitlist worker                       |
-| Tien Nguyen           | ticket purchase service               |
-| Vincent Babu          | k6 testing + Caddy; initial skeleton  |
+| Team Member | Files / Directories Owned This Sprint                                     |
+| ----------- | ---------------------------------------------------------------------     |
+| Benson Zheng          | event catalog service                                           |
+| Helektra Katsoulakis  | analytics worker + analytics db                                 |
+| Julia Farber          | purchase db + payment service                                   |
+| Katelyn Leung         | events db + notif. service                                      |
+| Maria Mechery         | ticket purchase service + user waitlist worker                  |
+| Tien Nguyen           | fraud detection service + worker                                |
+| Vincent Babu          | k6 testing + Caddy; initial skeleton; README.md + Sprint Plan   |
+| Ri Lu                 | notif. worker + Redis pub/sub definitions                       |
 
 > Ownership is verified by `git log --author`. Each person must have meaningful commits in the directories they claim.
 
