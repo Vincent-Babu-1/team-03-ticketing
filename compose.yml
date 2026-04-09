@@ -99,17 +99,17 @@ services:
   #
   # ── Redis template ─────────────────────────────────────────────────────────
   #
-  # redis:
-  #   image: redis:7
-  #   container_name: redis
-  #   restart: unless-stopped
-  #   networks:
-  #     - team-net
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 5s
-  #     timeout: 3s
-  #     retries: 5
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      - team-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   caddy:
     image: caddy:2-alpine
