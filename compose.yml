@@ -80,7 +80,7 @@ services:
 
   # EVENT CATALOG SERVICE:
   event-cat-service:
-    build: ./event-catalog-service
+    build: ./C-event-catalog
     container_name: event-cat-service
     restart: unless-stopped
     ports:
@@ -104,7 +104,7 @@ services:
 
   # TICKET PURCHASE SERVICE:
   purchase-service:
-    build: ./purchase-service
+    build: ./C-ticket-purchase
     container_name: purchase-service
     restart: unless-stopped
     ports:
@@ -128,7 +128,7 @@ services:
   
   # PAYMENT SERVICE:
   payment-service:
-    build: ./payment-service
+    build: ./C-payment
     container_name: payment-service
     restart: unless-stopped
     ports:
@@ -151,7 +151,7 @@ services:
 
   # NOTIFICATION SERVICE:
   notification-service:
-    build: ./notification-service
+    build: ./C-notification
     container_name: notification-service
     restart: unless-stopped
     ports:
@@ -172,7 +172,7 @@ services:
 
   # REFUND SERVICE:
   refund-service:
-    build: ./refund-service
+    build: ./C-refund
     container_name: refund-service
     restart: unless-stopped
     ports:
@@ -290,7 +290,7 @@ services:
       ports:
         - "5432:5432"
       volumes:
-        - purchase-data:/var/lib/postgresql/data
+        - purchase-db-data:/var/lib/postgresql/data
       networks:
         - team-net
       healthcheck:
@@ -348,9 +348,9 @@ services:
 #
 # volumes:
 #   postgres-data:
-  volumes:
-    purchase-db-data:
-    event-db-data:
-    fraud-db-data:
-    refund-db-data:
-    analytics-db-data:
+volumes:
+  purchase-db-data:
+  event-cat-db-data:
+  fraud-db-data:
+  refund-db-data:
+  analytics-db-data:
