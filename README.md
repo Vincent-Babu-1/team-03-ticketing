@@ -2,7 +2,7 @@
 
 **Course:** COMPSCI 426  
 
-**Team:** Benson Zheng, Helektra Katsoulakis, Julia Farber, Katelyn Leung, Maria Mechery, Tien Nguyen, Vincent Babu 
+**Team:** Benson Zheng, Helektra Katsoulakis, Julia Farber, Katelyn Leung, Maria Mechery, Tien Nguyen, Vincent Babu, Ri Lu
 
 **System:** Event Ticketing Platform
 
