@@ -77,6 +77,123 @@ services:
   #     retries: 3
   #     start_period: 15s
   #
+
+  # EVENT CATALOG SERVICE:
+  event-cat-service:
+    build: ./C-event-catalog
+    container_name: event-cat-service
+    restart: unless-stopped
+    ports:
+      - "3006:3001"
+    networks:
+      - team-net
+    environment:
+      - DATABASE_URL=postgres://user:pass@event-cat-db:5432/eventcatdb
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      event-cat-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # TICKET PURCHASE SERVICE:
+  purchase-service:
+    build: ./C-ticket-purchase
+    container_name: purchase-service
+    restart: unless-stopped
+    ports:
+      - "3002:3001"
+    networks:
+      - team-net
+    environment:
+      - DATABASE_URL=postgres://user:pass@purchase-db:5432/purchasedb
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      purchase-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+  
+  # PAYMENT SERVICE:
+  payment-service:
+    build: ./C-payment
+    container_name: payment-service
+    restart: unless-stopped
+    ports:
+      - "3003:3001"
+    networks:
+      - team-net
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      fraud-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # NOTIFICATION SERVICE:
+  notification-service:
+    build: ./C-notification
+    container_name: notification-service
+    restart: unless-stopped
+    ports:
+      - "3004:3001"
+    networks:
+      - team-net
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # REFUND SERVICE:
+  refund-service:
+    build: ./C-refund
+    container_name: refund-service
+    restart: unless-stopped
+    ports:
+      - "3005:3001"
+    networks:
+      - team-net
+    environment:
+      - DATABASE_URL=postgres://user:pass@refund-db:5432/refunddb
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      refund-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   # ── Postgres template ──────────────────────────────────────────────────────
   #
   # postgres:
@@ -97,6 +214,112 @@ services:
   #     timeout: 3s
   #     retries: 5
   #
+
+  # ANALYTICS DB:
+  analytics-db:
+     image: postgres:16 
+     container_name: analytics-db
+     restart: unless-stopped
+     environment:
+        POSTGRES_USER: user
+        POSTGRES_PASSWORD: pass
+        POSTGRES_DB: analyticsdb
+     ports:
+        - "5436:5432"
+     volumes:
+       - analytics-db-data:/var/lib/postgresql/data
+     networks:
+       - team-net
+     healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U user -d analyticsdb"]
+        interval: 5s
+        timeout: 3s
+        retries: 5
+
+  # EVENT CATALOG DB:
+  event-cat-db:
+     image: postgres:16 
+     container_name: event-cat-db
+     restart: unless-stopped
+     environment:
+        POSTGRES_USER: user
+        POSTGRES_PASSWORD: pass
+        POSTGRES_DB: eventcatdb
+     ports:
+       - "5433:5432"
+     volumes:
+       - event-cat-db-data:/var/lib/postgresql/data
+     networks:
+       - team-net
+     healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U user -d eventdb"]
+        interval: 5s
+        timeout: 3s
+        retries: 5  
+
+  # FRAUD DB:
+  fraud-db:
+     image: postgres:16 
+     container_name: fraud-db
+     restart: unless-stopped
+     environment:
+        POSTGRES_USER: user
+        POSTGRES_PASSWORD: pass
+        POSTGRES_DB: frauddb
+     ports:
+        - "5434:5432"
+     volumes:
+       - fraud-db-data:/var/lib/postgresql/data
+     networks:
+       - team-net
+     healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U user -d frauddb"]
+        interval: 5s
+        timeout: 3s
+        retries: 5
+    
+  # PURCHASE DB:
+  purchase-db: 
+      image: postgres:16 
+      container_name: purchase-db
+      restart: unless-stopped
+      environment:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: pass
+          POSTGRES_DB: purchasedb
+      ports:
+        - "5432:5432"
+      volumes:
+        - purchase-db-data:/var/lib/postgresql/data
+      networks:
+        - team-net
+      healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U user -d purchasedb"]
+          interval: 5s
+          timeout: 3s
+          retries: 5
+
+  # REFUND DB:
+  refund-db: 
+      image: postgres:16 
+      container_name: refund-db
+      restart: unless-stopped
+      environment:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: pass
+          POSTGRES_DB: refunddb
+      ports:
+        - "5435:5432"
+      volumes:
+        - refund-db-data:/var/lib/postgresql/data
+      networks:
+        - team-net
+      healthcheck:
+          test: ["CMD-SHELL", "pg_isready -U user -d refunddb"]
+          interval: 5s
+          timeout: 3s
+          retries: 5
+
   # ── Redis template ─────────────────────────────────────────────────────────
   #
   redis:
@@ -127,3 +350,9 @@ services:
 #
 # volumes:
 #   postgres-data:
+volumes:
+  purchase-db-data:
+  event-cat-db-data:
+  fraud-db-data:
+  refund-db-data:
+  analytics-db-data:
