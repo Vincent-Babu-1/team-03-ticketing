@@ -151,8 +151,8 @@ services:
 
   # NOTIFICATION SERVICE:
   notification-service:
-    build: ./notification-service
-    container_name: notification-service
+    build: ./C-notification
+    command: node notif-service.js
     restart: unless-stopped
     ports:
       - "3004:3001"
@@ -169,6 +169,18 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  notification-worker:
+    build: ./C-notification
+    command: node notif-worker.js
+    restart: unless-stopped
+    networks:
+      - team-net
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
 
   # REFUND SERVICE:
   refund-service:

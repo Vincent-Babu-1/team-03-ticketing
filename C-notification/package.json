@@ -1,11 +1,13 @@
 {
   "name": "notification",
   "version": "1.0.0",
-  "dependencies": {
-    "redis": "^4.6.10"
-  },
+  "main": "notif-service.js",
   "scripts": {
     "service": "node notif-service.js",
     "worker": "node notif-worker.js"
+  },
+  "dependencies": {
+    "ioredis": "^5.3.2",
+    "express": "^4.18.2"
   }
 }
