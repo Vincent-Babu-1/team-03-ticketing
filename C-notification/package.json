@@ -1,0 +1,11 @@
+{
+  "name": "notification",
+  "version": "1.0.0",
+  "dependencies": {
+    "redis": "^4.6.10"
+  },
+  "scripts": {
+    "service": "node notif-service.js",
+    "worker": "node notif-worker.js"
+  }
+}
