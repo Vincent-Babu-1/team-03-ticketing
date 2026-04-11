@@ -151,8 +151,10 @@ services:
 
   # NOTIFICATION SERVICE:
   notification-service:
-    build: ./C-notification
-    container_name: notification-service
+    build:
+      context: .
+      dockerfile: ./C-notification/Dockerfile
+    command: node notif-service.js
     restart: unless-stopped
     ports:
       - "3004:3001"
@@ -163,12 +165,20 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+
+  notification-worker:
+    build:
+      context: .
+      dockerfile: ./C-notification/Dockerfile
+    command: node notif-worker.js
+    restart: unless-stopped
+    networks:
+      - team-net
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
 
   # REFUND SERVICE:
   refund-service:
@@ -252,7 +262,7 @@ services:
      networks:
        - team-net
      healthcheck:
-        test: ["CMD-SHELL", "pg_isready -U user -d eventdb"]
+        test: ["CMD-SHELL", "pg_isready -U user -d eventcatdb"]        
         interval: 5s
         timeout: 3s
         retries: 5  
@@ -321,18 +331,20 @@ services:
           retries: 5
 
   # ── Redis template ─────────────────────────────────────────────────────────
-
+  #
   redis:
-     image: redis:7
-     container_name: redis
-     restart: unless-stopped
-     networks:
-       - team-net
-     healthcheck:
-       test: ["CMD", "redis-cli", "ping"]
-       interval: 5s
-       timeout: 3s
-       retries: 5
+    image: redis:7
+    ports:
+      - "6379:6379"
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      - team-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   caddy:
     image: caddy:2-alpine

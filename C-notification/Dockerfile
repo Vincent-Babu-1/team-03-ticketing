@@ -1,11 +1,10 @@
 FROM node:20-alpine
+WORKDIR /app
 
-WORKDIR /C-ticket-purchase
+# Copy shared redis.js from root
+COPY redis.js ./redis.js
 
-COPY notif-service.js .
-
-COPY notif-worker.js .
-
-EXPOSE 3004
-
-CMD ["node", "notif-service.js", "&&", "notif-worker.js"]
+# Copy the notification service files
+COPY C-notification/package*.json ./
+RUN npm install
+COPY C-notification/ .
