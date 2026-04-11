@@ -1,9 +1,6 @@
 FROM node:20-alpine
-
 WORKDIR /C-refund
-
-COPY service.js .
-
-EXPOSE 3005
-
+COPY package.json package-lock.json* ./
+RUN npm install
+COPY . .
 CMD ["node", "service.js"]
