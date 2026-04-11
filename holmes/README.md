@@ -347,5 +347,5 @@ psql postgres://user:pass@postgres:5432/mydb \
 
 ```bash
 # Example: live-poll a health endpoint
-healthcheck http://order-service:3000/health
+healthcheck http://order-service:3000/healthz
 ```
