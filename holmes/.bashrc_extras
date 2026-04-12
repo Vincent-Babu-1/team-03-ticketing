@@ -7,7 +7,7 @@ alias lt="lsd --tree"
 alias cat="bat --paging=never"
 
 # quick health check loop
-# usage: healthcheck http://my-service:3000/health
+# usage: healthcheck http://my-service:3000/healthz
 healthcheck() {
     watch -n 2 "curl -s $1 | jq ."
 }

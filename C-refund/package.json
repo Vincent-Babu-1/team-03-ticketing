@@ -1,0 +1,15 @@
+{
+  "name": "refund-service",
+  "version": "1.0.0",
+  "main": "service.js",
+  "type": "module",
+  "scripts": {
+    "service": "node service.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "axios": "^1.8.4",
+    "pg": "^8.13.3",
+    "redis": "^4.7.0"
+  }
+}
