@@ -60,9 +60,21 @@ async function applySideEffect(refundRequestId, purchaseId) {
 console.log("started refund service");
 
 app.get('/healthz', async (req, res) => {
-  await pool.query('SELECT 1');
+  const pgCheck = await pool.query('SELECT 1');
+  if (pgCheck==null) {
+    res.status(503).json({ ok: false, status: 'db-not-ready', service: 'refund' })
+    return;
+  }
+
+  try {
+    await redis.ping()
+    res.status(200).json({ ok: true, status: 'ok', service: 'refund' })
+  } catch {
+    res.status(503).json({ ok: false, status: 'redis-not-ready', service: 'refund' })
+  }
+  
   //console.log("received health check")
-  res.json({ ok: true, service: 'refund' });
+  //res.json({ ok: true, service: 'refund' });
 });
 
 app.post('/refund-request', async (req, res) => {
