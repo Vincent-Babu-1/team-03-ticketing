@@ -51,6 +51,34 @@ services:
     # Holmes has no ports — access it via: docker compose exec holmes bash
 
   # ── Add your services here ─────────────────────────────────────────────────
+  event-db:
+    image: postgres:16
+    container_name: event-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: mydb
+    volumes:
+      - event-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "5433:5432"
+
+  event-service:
+    build: ./C-event-catalog
+    working_dir: /app
+    volumes:
+      - ./C-event-catalog:/app
+    command: npm start
+    ports:
+      - "3006:3000"
+    depends_on:
+      - event-db
   #
   # Pattern for each service:
   #
@@ -121,6 +149,9 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
 # ── Named volumes ──────────────────────────────────────────────────────────────
+
+volumes:
+  event-db:
 # Declare a volume for each database here, e.g.:
 #
 # volumes:
