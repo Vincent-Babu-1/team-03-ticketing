@@ -182,7 +182,10 @@ services:
 
   # REFUND SERVICE:
   refund-service:
-    build: ./C-refund
+    build:
+      context: .
+      dockerfile: ./C-refund/Dockerfile
+    command: node service.js
     container_name: refund-service
     restart: unless-stopped
     ports:
@@ -192,6 +195,8 @@ services:
     environment:
       - DATABASE_URL=postgres://user:pass@refund-db:5432/refunddb
       - REDIS_URL=redis://redis:6379
+      - PIPELINE=team-03
+      - QUEUE_NAME=refundRequests
     depends_on:
       refund-db:
         condition: service_healthy
