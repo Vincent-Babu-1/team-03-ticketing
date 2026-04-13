@@ -1,4 +1,3 @@
-
 # lsd aliases
 alias ll="lsd -la"
 alias l="lsd -l"

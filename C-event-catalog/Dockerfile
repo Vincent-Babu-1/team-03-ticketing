@@ -1,9 +1,10 @@
 FROM node:20-alpine
 
-WORKDIR /C-ticket-purchase
+WORKDIR /app
 
-COPY service.js .
+COPY package*.json ./
+RUN npm install
 
-EXPOSE 3006
+COPY . .
 
-CMD ["node", "service.js"]
+CMD ["npm", "start"]
