@@ -1,7 +1,9 @@
 {
     "name": "analytics-worker",
     "version": "1.0.0",
+    "type": "module",
     "main": "index.js",
+    "private": true,
     "dependencies": {
       "pg": "^8.11.0",
       "redis": "^4.6.0"
