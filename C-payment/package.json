@@ -1,0 +1,16 @@
+{
+    "name": "payment-service",
+    "version": "1.0.0",
+    "description": "Payment processing for the Event Ticketing Platform.",
+    "type": "module",
+    "main": "service.js",
+    "private": true,
+    "scripts": {
+        "start": "node service.js"
+    },
+    "dependencies": {
+        "express": "^5.2.1",
+        "pg": "^8.20.0",
+        "redis": "^5.11.0"
+    }
+}
