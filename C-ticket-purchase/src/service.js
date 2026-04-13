@@ -97,7 +97,7 @@ app.post('/purchases', async (req, res) => {
 
   // If payment succeeded, notify other services via Redis
   if (status === 'confirmed') {
-    await redis.publish('purchase-confirmed', JSON.stringify({ purchaseId, userId, eventId }));
+    await redis.publish('confirmed-purchases', JSON.stringify({ purchaseId, userId, eventId }));
     await redis.rPush('analytics-queue', JSON.stringify({ event: 'ticket_purchased', purchaseId }));
   }
 
