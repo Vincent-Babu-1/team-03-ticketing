@@ -24,10 +24,7 @@ CREATE TABLE IF NOT EXISTS reservations (
     seat_id UUID NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('released', 'pending', 'confirmed')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_purchase_res
-    FOREIGN KEY (purchase_id)
-    REFERENCES purchases(id)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS payments (
@@ -37,8 +34,5 @@ CREATE TABLE IF NOT EXISTS payments (
     total_usd NUMERIC(10,2) NOT NULL CHECK (total_usd > 0),
     status TEXT NOT NULL CHECK (status IN ('failed', 'refunded', 'succeeded')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_purchase_pay
-    FOREIGN KEY (purchase_id)
-    REFERENCES purchases(id)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

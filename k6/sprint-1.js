@@ -20,7 +20,7 @@ const errorRate = new Rate("errors");
 // Update this URL to point to your main read endpoint.
 // From inside the holmes container, use the service name (not localhost).
 //const TARGET_URL = "http://refund-service:3005/health"; // OLD
-const TARGET_URL = "http://purchase-service:3002/purchases"; // NEW
+const TARGET_URL = "http://purchase-service:3001/purchases"; // NEW
 
 function newUUID(){ 
   //return crypto.randomUUID(); 
@@ -44,8 +44,8 @@ export default function () {
   // /* 
   const data = {
     purchaseId: newUUID(),
-    userId: "test-user-1",
-    eventId: "test-event-1",
+    userId: newUUID(),
+    eventId: newUUID(),
     quantity: 2,
     cardToken: "test-card-1"
   }

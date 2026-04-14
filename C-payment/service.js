@@ -1,8 +1,8 @@
 import express from 'express'
 import crypto from 'crypto'
-import { checkDb, checkRedis } from './wait.js'
+import { pool, checkDb, checkRedis } from './wait.js'
 
-const SIMULATED_SUCCESS_RATE = process.env.SIMULATED_SUCCESS_RATE || '0.95';
+const SIMULATED_SUCCESS_RATE = parseFloat(process.env.SIMULATED_SUCCESS_RATE || '1.0');
 const PORT = 3001;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

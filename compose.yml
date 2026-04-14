@@ -140,7 +140,7 @@ services:
     environment:
       - DATABASE_URL=postgres://user:pass@purchase-db:5432/purchasedb
       - REDIS_URL=redis://redis:6379
-      - SIM_SUCCESS_RATE=0.95
+      - SIM_SUCCESS_RATE=1.0
     depends_on:
       purchase-db:
         condition: service_healthy
@@ -312,6 +312,7 @@ services:
         - "5437:5432"
       volumes:
         - purchase-db-data:/var/lib/postgresql/data
+        - ./DB-folder/DB-purchase.sql:/docker-entrypoint-initdb.d/init.sql:ro
       networks:
         - team-net
       healthcheck:
