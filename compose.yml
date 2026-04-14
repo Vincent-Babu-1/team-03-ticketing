@@ -84,6 +84,7 @@ services:
     working_dir: /app
     volumes:
       - ./C-event-catalog:/app
+      - /app/node_modules
     command: npm start
     ports:
       - "3006:3001"
