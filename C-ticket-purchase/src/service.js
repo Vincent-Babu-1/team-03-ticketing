@@ -7,7 +7,7 @@ const app = express();
 app.use(express.json());
 
 const PORT = 3001;
-const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3001';
+const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3003';
 
 // ── GET /health ──────────────────────────────────────────────────────────────
 // Returns 200 if DB and Redis are both reachable, 503 if either is down
