@@ -1,4 +1,4 @@
-# Sprint 1 Report — [Team Name]
+# Sprint 1 Report — [Team 3]
 
 **Sprint:** 1 — Foundation  
 **Tag:** `sprint-1`  
