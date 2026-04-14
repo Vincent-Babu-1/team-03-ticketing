@@ -216,6 +216,24 @@ services:
       retries: 3
       start_period: 15s
 
+  fraud-worker:
+    build: ./C-fraud
+    container_name: fraud-worker
+    restart: unless-stopped
+    networks:
+      - team-net
+    environment:
+      - DATABASE_URL=postgres://user:pass@fraud-db:5432/frauddb
+      - REDIS_URL=redis://redis:6379
+      - QUEUE_NAME=purchase-events
+      - DLQ_NAME=fraud-dlq
+    depends_on:
+      fraud-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: node worker.js
+    
   # ── Postgres template ──────────────────────────────────────────────────────
   #
   # postgres:
@@ -292,6 +310,7 @@ services:
         - "5434:5432"
      volumes:
        - fraud-db-data:/var/lib/postgresql/data
+       - ./DB-folder/DB-fraud.sql:/docker-entrypoint-initdb.d/init.sql:ro
      networks:
        - team-net
      healthcheck:
