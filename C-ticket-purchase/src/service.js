@@ -6,7 +6,7 @@ import redis, { checkRedis } from './redis.js';
 const app = express();
 app.use(express.json());
 
-const PORT = 3001;
+const PORT = 3002;
 const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3001';
 
 // ── GET /health ──────────────────────────────────────────────────────────────
@@ -31,11 +31,13 @@ app.get('/health', async (req, res) => {
 
   if (allGood) {
   res.status(200).json({
+    service: 'purchase',
     status: 'ok',
     ...health
   });
   } else {
   res.status(503).json({
+    service: 'purchase',
     status: 'degraded',
     ...health
   });
@@ -45,6 +47,7 @@ app.get('/health', async (req, res) => {
 // ── POST /purchases ──────────────────────────────────────────────────────────
 // Creates a new ticket purchase
 app.post('/purchases', async (req, res) => {
+  console.log("called purchases");
   // Check for idempotency key in the request header
   const idempotencyKey = req.headers['idempotency-key'];
   if (!idempotencyKey) {
@@ -54,6 +57,7 @@ app.post('/purchases', async (req, res) => {
   // Gets the fields from the request body & checks if anything missing
   const { userId, eventId, quantity, cardToken } = req.body;
   if (!userId || !eventId || !quantity || !cardToken) {
+    console.log(`purchase ${idempotencyKey} is not valid (missing fields)`);
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
@@ -63,8 +67,11 @@ app.post('/purchases', async (req, res) => {
     [idempotencyKey]
   );
   if (existing.rows.length > 0) {
+    console.log(`purchase ${idempotencyKey} is valid but not unique`);
     return res.status(200).json(existing.rows[0]);
   }
+
+  console.log(`purchase ${idempotencyKey} is valid and unique`);
 
   // Call the Payment Service to process payment
   let paymentResult;
@@ -76,6 +83,7 @@ app.post('/purchases', async (req, res) => {
     });
     paymentResult = await payRes.json();
   } catch (err) {
+    console.log(`Payment Service unavailable`);
     return res.status(503).json({ error: 'Payment Service unavailable' });
   }
 
@@ -86,6 +94,7 @@ app.post('/purchases', async (req, res) => {
   } else {
     status = 'failed';
   }
+  console.log(`purchase ${idempotencyKey} received payment message: ${status}`);
   const totalUsd = (quantity * 102).toFixed(2);
   const purchaseId = crypto.randomUUID();
 
@@ -102,6 +111,7 @@ app.post('/purchases', async (req, res) => {
   }
 
   if (status === 'confirmed') {
+    console.log(`purchase ${idempotencyKey} confirmed!`);
     return res.status(201).json({
       purchaseId,
       userId,
@@ -112,6 +122,7 @@ app.post('/purchases', async (req, res) => {
       createdAt: new Date().toISOString()
     });
   } else {
+    console.log(`purchase ${idempotencyKey} failed (due to payment error)!`);
     return res.status(402).json({
       purchaseId,
       userId,

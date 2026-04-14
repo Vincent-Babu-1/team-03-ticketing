@@ -59,12 +59,12 @@ async function applySideEffect(refundRequestId, purchaseId) {
 
 console.log("started refund service");
 
-app.get('/healthz', async (req, res) => {
-  const pgCheck = await pool.query('SELECT 1');
-  if (pgCheck==null) {
-    res.status(503).json({ ok: false, status: 'db-not-ready', service: 'refund' })
-    return;
-  }
+app.get('/health', async (req, res) => {
+  //const pgCheck = await pool.query('SELECT 1');
+  //if (pgCheck==null) {
+  //  res.status(503).json({ ok: false, status: 'db-not-ready', service: 'refund' })
+  //  return;
+  //}
 
   try {
     await redis.ping()
@@ -149,8 +149,19 @@ app.listen(port, () => {
 /*
 docker compose exec holmes bash
 
+k6 run /workspace/k6/sprint-1.js
+
+healthcheck http://purchase-service:3002/health
+curl http://refund-service:3005/health | jq .
+curl http://purchase-service:3002/health | jq
+
 curl -s -X POST http://refund-service:3005/refund-request \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: 'idem-001'" \
   -d '{"refundRequestId": "refund-004", "purchaseId": "purchase-001"}' | jq .
+
+curl -s -X POST http://purchase-service:3002/purchases \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" \
+  -d '{"purchaseId": "test-purchase-idem-1", "userId": "test-user-1", "eventId": "test-event-1", "quantity": 2, "cardToken": "test-card-1"}' | jq .
 */
