@@ -27,8 +27,8 @@ app.get("/events", (req, res) => {
     const body = [
         {
             "id": 1,
-            "name": "Drake Concert",
-            "venueId": 2,
+            "eventName": "Drake Concert",
+            "revenueId": 2,
             "date": "2026-05-10",
             "time": "20:00:00",
             "description": "Live concert",
