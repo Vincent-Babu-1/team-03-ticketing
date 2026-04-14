@@ -81,12 +81,12 @@ services:
   # EVENT CATALOG SERVICE:
   event-cat-service:
     build: ./C-event-catalog
-    container_name: event-cat-service
-    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./C-event-catalog:/app
+    command: npm start
     ports:
       - "3006:3001"
-    networks:
-      - team-net
     environment:
       - DATABASE_URL=postgres://user:pass@event-cat-db:5432/eventcatdb
       - REDIS_URL=redis://redis:6379
@@ -101,6 +101,8 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    networks:
+      - team-net
 
   # TICKET PURCHASE SERVICE:
   purchase-service:
@@ -303,7 +305,7 @@ services:
           POSTGRES_PASSWORD: pass
           POSTGRES_DB: purchasedb
       ports:
-        - "5432:5432"
+        - "5437:5432"
       volumes:
         - purchase-db-data:/var/lib/postgresql/data
       networks:
