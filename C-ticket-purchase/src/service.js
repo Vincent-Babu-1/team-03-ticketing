@@ -6,7 +6,7 @@ import redis, { checkRedis } from './redis.js';
 const app = express();
 app.use(express.json());
 
-const PORT = 3002;
+const PORT = 3001;
 const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3001';
 
 // ── GET /health ──────────────────────────────────────────────────────────────
@@ -75,11 +75,12 @@ app.post('/purchases', async (req, res) => {
 
   // Call the Payment Service to process payment
   let paymentResult;
+  const purchaseId = crypto.randomUUID();
   try {
     const payRes = await fetch(`${PAYMENT_SERVICE_URL}/payments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: quantity * 102, cardToken }),
+      body: JSON.stringify({ purchase_id: purchaseId, amount: quantity * 102, cardToken }),
     });
     paymentResult = await payRes.json();
   } catch (err) {
@@ -96,7 +97,6 @@ app.post('/purchases', async (req, res) => {
   }
   console.log(`purchase ${idempotencyKey} received payment message: ${status}`);
   const totalUsd = (quantity * 102).toFixed(2);
-  const purchaseId = crypto.randomUUID();
 
   await pool.query(
     `INSERT INTO purchases (id, idempotency_key, user_id, event_id, quantity, total_usd, card_token, status)
@@ -110,9 +110,11 @@ app.post('/purchases', async (req, res) => {
     await redis.rPush('analytics-queue', JSON.stringify({ event: 'ticket_purchased', purchaseId }));
   }
 
+  // Julia: changed status from 201 to 200 to pass k1 test. We should discuss this during class so
+  // we can have consistent agreements on expected returns statuses.
   if (status === 'confirmed') {
     console.log(`purchase ${idempotencyKey} confirmed!`);
-    return res.status(201).json({
+    return res.status(200).json({
       purchaseId,
       userId,
       eventId,
