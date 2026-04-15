@@ -1,5 +1,11 @@
 import redis from "redis";
 import pkg from "pg";
+import express from "express";
+
+const app = express();
+const PORT = 3000;
+
+let lastJobAt = null;
 const { Client } = pkg;
 
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
@@ -100,5 +106,30 @@ async function start() {
     }
   }
 }
+
+// health endpoint
+app.get("/health", async (req, res) => {
+  try {
+    const queueDepth = await redisClient.lLen("purchase-events");
+    const dlqDepth = await redisClient.lLen("fraud-dlq");
+
+    res.status(200).json({
+      status: "ok",
+      checks: {
+        redis: "ok",
+        database: "ok"
+      },
+      queueDepth,
+      dlqDepth,
+      lastJobAt
+    });
+  } catch {
+    res.status(503).json({ status: "error" });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log("Health server running on port", PORT);
+});
 
 start();

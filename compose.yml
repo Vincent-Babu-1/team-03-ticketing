@@ -227,6 +227,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - QUEUE_NAME=purchase-events
       - DLQ_NAME=fraud-dlq
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
     depends_on:
       fraud-db:
         condition: service_healthy
