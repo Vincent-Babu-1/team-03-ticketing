@@ -1,11 +1,13 @@
 FROM node:20-alpine
 
-WORKDIR /C-ticket-purchase
+WORKDIR /app
 
-COPY service.js .
+COPY package*.json ./
 
-COPY waitlist.js .
+RUN npm install
+
+COPY . .
 
 EXPOSE 3003
 
-CMD ["node", "service.js", "&&", "waitlist.js"]
+CMD ["npm", "start"]
