@@ -1,5 +1,8 @@
 CREATE TABLE IF NOT EXISTS events (
-  eventName TEXT NOT NULL,
-  venue TEXT NOT NULL,
-  seatInv INT NOT NULL
+  id  UUID  PRIMARY KEY,
+  name TEXT NOT NULL,
+  price NUMERIC(10,2) NOT NULL,
+  dateTime TIMESTAMPTZ,
+  description TEXT.
+  category TEXT,
 );

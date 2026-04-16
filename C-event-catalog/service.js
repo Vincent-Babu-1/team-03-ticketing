@@ -2,6 +2,21 @@ import express from "express"
 import pg from "pg";
 import { createClient } from "redis";
 
+const data = [
+        {
+            "id": 1,
+            "name": "Drake Concert",
+            "price": 2,
+            "dateTime": "2026-05-10",
+            "description": "Live concert",
+            "category": "music"
+        }
+    ]
+
+const EVENTS_LIST_KEY = "events:all";
+const EVENTS_LIST_TTL = 60;
+const EVENT_TTL = 300;
+
 const startTime = Date.now();
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -23,19 +38,14 @@ app.get("/", (req, res) => {
   res.send("Hello World");
 });
 
-app.get("/events", (req, res) => {
-    const body = [
-        {
-            "id": 1,
-            "eventName": "Drake Concert",
-            "revenueId": 2,
-            "date": "2026-05-10",
-            "time": "20:00:00",
-            "description": "Live concert",
-            "category": "music"
-        }
-    ]
-    return res.status(200).json(body)
+app.get("/events", async (req, res) => {
+    try{
+        const cached = await redis.get(EVENTS_LIST_KEY);
+    }catch(err){
+
+    }
+    const body = data;
+    return res.status(200).json(body);
 });
 
 app.get("/health", async (req, res) => {
