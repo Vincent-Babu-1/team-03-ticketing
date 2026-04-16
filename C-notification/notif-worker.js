@@ -1,6 +1,6 @@
 import { redisSubscriber } from "./redis.js";
 
-console.log("🔥 WORKER FILE STARTED");
+console.log("WORKER FILE STARTED");
 const CHANNEL = "confirmed-purchases";
 
 async function startWorker() {
@@ -42,6 +42,6 @@ Body: Your purchase of ${data.item} is confirmed.
 
 // startup safety
 startWorker().catch((err) => {
-  console.error("🔥 Worker failed to start:", err);
+  console.error("Worker failed to start:", err);
   process.exit(1);
 });
