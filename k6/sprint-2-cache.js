@@ -8,7 +8,7 @@
 //   k6 run k6/sprint-2-cache.js
 //
 
-/*
+
 
 import http from "k6/http";
 import { check, sleep } from "k6";
@@ -21,7 +21,7 @@ const errorRate = new Rate("errors");
 // Update this URL to point to your main read endpoint.
 // From inside the holmes container, use the service name (not localhost).
 const TARGET_URL = "http://purchase-service:3001/purchases"; // NEW
-const TARGET_URL1 = "http://purchase-service:3001/purchases/id:"; // NEW
+const TARGET_URL1 = "http://purchase-service:3001/purchases/"; // NEW
 
 function newUUID(){ 
   //return crypto.randomUUID(); 
@@ -44,10 +44,8 @@ export const options = {
 // comparison between the two will be done by hand afterwards
 
 export default function () {
-  const purchaseId = newUUID()
   
   const data = {
-    purchaseId: purchaseId,
     userId: newUUID(),
     eventId: newUUID(),
     quantity: 2,
@@ -65,10 +63,11 @@ export default function () {
     "status is 200": (r) => r.status === 200,
     "response time < 500ms": (r) => r.timings.duration < 500,
   });
-
+  
   sleep(0.5);
 
-  const res1 = http.get(TARGET_URL1 + purchaseId);
+  const getURL = TARGET_URL1 + res.json().purchaseId
+  const res1 = http.get(getURL);
   
   const ok1 = check(res1, {
     "status is 200": (r) => r.status === 200,
@@ -78,8 +77,4 @@ export default function () {
   errorRate.add((!ok) || (!ok1));
   sleep(0.5);
 
-  
-
 }
-
-*/

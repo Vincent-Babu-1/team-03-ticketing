@@ -149,10 +149,10 @@ app.listen(port, () => {
 /*
 docker compose exec holmes bash
 
-k6 run /workspace/k6/sprint-1.js
+k6 run /workspace/k6/sprint-2-cache.js
 
 mkdir -p results
-k6 run --summary-export results/k6-summary.json /workspace/k6/sprint-1.js | tee results/k6-output.txt
+k6 run --summary-export results/k6-sprint-2-cache-output-initial-summary.json /workspace/k6/sprint-2-cache.js | tee results/k6-sprint-2-cache-output-initial.txt
 
 healthcheck http://purchase-service:3001/health
 curl http://refund-service:3005/health | jq .
