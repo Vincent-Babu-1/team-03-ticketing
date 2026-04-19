@@ -17,12 +17,12 @@ async function startWorker() {
 
       // simulate email sending
       const emailLog = `
-=== EMAIL SENT ===
-To: ${data.email}
-Subject: Purchase Confirmation
-Body: Your purchase of ${data.item} is confirmed.
-==================
-`;
+        === EMAIL SENT ===
+        To: ${data.email}
+        Subject: Purchase Confirmation
+        Body: Your purchase of ${data.item} is confirmed.
+        ==================
+        `;
 
       console.log(emailLog);
 
