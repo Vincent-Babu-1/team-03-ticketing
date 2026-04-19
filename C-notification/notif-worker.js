@@ -4,7 +4,7 @@ console.log("WORKER FILE STARTED");
 const CHANNEL = "confirmed-purchases";
 
 async function startWorker() {
-  console.log("📡 Notification worker starting...");
+  console.log("Notification worker starting...");
 
 
   // 2. subscribe AFTER connection
@@ -12,7 +12,7 @@ async function startWorker() {
     try {
       const data = JSON.parse(message);
 
-      console.log("📩 Received confirmed purchase:");
+      console.log("Received confirmed purchase:");
       console.log(data);
 
       // simulate email sending
@@ -30,11 +30,11 @@ Body: Your purchase of ${data.item} is confirmed.
       // fs.appendFileSync("emails.log", emailLog);
 
     } catch (err) {
-      console.error("❌ Failed to process message:", err);
+      console.error("Failed to process message:", err);
     }
   });
 
-  console.log(`👂 Listening on ${CHANNEL}...`);
+  console.log(`Listening on ${CHANNEL}...`);
 
   // keep process alive (important for Docker)
   process.stdin.resume();
@@ -42,6 +42,6 @@ Body: Your purchase of ${data.item} is confirmed.
 
 // startup safety
 startWorker().catch((err) => {
-  console.error("Worker failed to start:", err);
+  console.error("🔥 Worker failed to start:", err);
   process.exit(1);
 });
