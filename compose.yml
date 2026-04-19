@@ -97,7 +97,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://event-cat-service:3001/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -172,6 +172,12 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://notification-service:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   notification-worker:
     build:

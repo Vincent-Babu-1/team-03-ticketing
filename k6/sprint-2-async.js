@@ -1,11 +1,11 @@
-// Sprint 2 — Comparison load test
+// Sprint 2 — Async queue test
 //
 // Run from inside the holmes container:
 //   docker compose exec holmes bash
-//   k6 run /workspace/k6/sprint-2-cache.js
+//   k6 run /workspace/k6/sprint-2-async.js
 //
 // Or from your host machine if k6 is installed:
-//   k6 run k6/sprint-2-cache.js
+//   k6 run k6/sprint-2-async.js
 //
 
 
@@ -20,8 +20,8 @@ const errorRate = new Rate("errors");
 // ── Configuration ─────────────────────────────────────────────────────────────
 // Update this URL to point to your main read endpoint.
 // From inside the holmes container, use the service name (not localhost).
-const TARGET_URL = "http://purchase-service:3001/purchases"; // NEW
-const TARGET_URL1 = "http://purchase-service:3001/purchases/"; // NEW
+const POST_URL = "http://purchase-service:3001/purchases"; 
+const HEALTH_URL = "http://analytics-worker:3001/health"; 
 
 function newUUID(){ 
   //return crypto.randomUUID(); 
@@ -52,7 +52,7 @@ export default function () {
     cardToken: "test-card-1"
   }
 
-  let res = http.post(TARGET_URL, JSON.stringify(data), {
+  let res = http.post(POST_URL, JSON.stringify(data), {
     headers: { 
       'Content-Type': 'application/json',
       'Idempotency-Key': newUUID()
@@ -63,17 +63,23 @@ export default function () {
     "status is 200": (r) => r.status === 200,
     "response time < 500ms": (r) => r.timings.duration < 500,
   });
-  
-  sleep(0.5);
 
-  const getURL = TARGET_URL1 + res.json().purchaseId
-  const res1 = http.get(getURL);
+  const res1 = http.get(HEALTH_URL);
   
   const ok1 = check(res1, {
     "status is 200": (r) => r.status === 200,
     "response time < 500ms": (r) => r.timings.duration < 500,
   });
+
+  if (!res1.json().queueDepth){
+    console.log("WARNING: analytics worker /health not implemented, or missing return value `queueDepth`")
+    errorRate.add(!ok1);
+    sleep(0.5);
+    return;
+  }
   
+  console.log("analytics queue depth: " + res1.json().queueDepth);
+
   errorRate.add((!ok) || (!ok1));
   sleep(0.5);
 
