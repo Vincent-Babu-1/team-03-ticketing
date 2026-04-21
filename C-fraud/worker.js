@@ -5,52 +5,47 @@ import express from "express";
 const app = express();
 const PORT = 3000;
 
-let lastJobAt = null;
 const { Client } = pkg;
 
+// ENV
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
 const DATABASE_URL =
   process.env.DATABASE_URL || "postgres://user:pass@fraud-db:5432/frauddb";
 
-const QUEUE_NAME = "purchase-events";      
-const DLQ_NAME = "fraud-dlq";              
-const PUBSUB_CHANNEL = "fraud-flagged";    
+const QUEUE_NAME = "purchase-events";
+const DLQ_NAME = "fraud-dlq";
+const PUBSUB_CHANNEL = "fraud-flagged";
 
 // Clients
 const redisClient = redis.createClient({ url: REDIS_URL });
-const subscriber = redis.createClient({ url: REDIS_URL });
-
 const db = new Client({ connectionString: DATABASE_URL });
 
-const recentPurchases = new Map(); // userId -> timestamps
-const paymentTokenMap = new Map(); // token -> count
+// Tracking
+let lastJobAt = null;
+const recentPurchases = new Map();
+const paymentTokenMap = new Map();
 
 // ---------------------------
 // FRAUD RULES
 // ---------------------------
-
 function suspicious_activity(event) {
-  const { userId, paymentToken, timestamp } = event;
+  const { userId, paymentToken } = event;
 
-  // Rule 1: same payment token used too often
+  // Rule 1: payment token reuse
   const tokenCount = (paymentTokenMap.get(paymentToken) || 0) + 1;
   paymentTokenMap.set(paymentToken, tokenCount);
 
-  if (tokenCount > 3) {
-    return "payment_token_reuse";
-  }
+  if (tokenCount > 3) return "payment_token_reuse";
 
-  // Rule 2: too many purchases quickly
+  // Rule 2: rapid purchases
   const now = Date.now();
   const userHistory = recentPurchases.get(userId) || [];
 
-  const updated = userHistory.filter(t => now - t < 10000); // last 10 sec
+  const updated = userHistory.filter(t => now - t < 10000);
   updated.push(now);
   recentPurchases.set(userId, updated);
 
-  if (updated.length > 5) {
-    return "rapid_purchases";
-  }
+  if (updated.length > 5) return "rapid_purchases";
 
   return null;
 }
@@ -58,25 +53,22 @@ function suspicious_activity(event) {
 // ---------------------------
 // MAIN WORKER LOOP
 // ---------------------------
-
 async function start() {
   await redisClient.connect();
-  await subscriber.connect();
   await db.connect();
 
   console.log("Fraud worker started");
 
   while (true) {
     try {
-      // Blocking pop from Redis queue
       const result = await redisClient.brPop(QUEUE_NAME, 0);
       const raw = result.element;
 
       let event;
       try {
         event = JSON.parse(raw);
-      } catch (err) {
-        console.error("Poison pill (bad JSON)");
+      } catch {
+        console.error("Poison pill");
         await redisClient.lPush(DLQ_NAME, raw);
         continue;
       }
@@ -84,15 +76,13 @@ async function start() {
       const reason = suspicious_activity(event);
 
       if (reason) {
-        console.log("FRAUD DETECTED:", reason, event);
+        console.log("FRAUD DETECTED:", reason);
 
-        // Store in DB
         await db.query(
           "INSERT INTO fraud_flags(user_id, reason, created_at) VALUES($1,$2,NOW())",
           [event.userId, reason]
         );
 
-        // Publish alert
         await redisClient.publish(
           PUBSUB_CHANNEL,
           JSON.stringify({ ...event, reason })
@@ -100,6 +90,7 @@ async function start() {
       } else {
         console.log("Normal purchase:", event.userId);
       }
+      lastJobAt = new Date().toISOString();
 
     } catch (err) {
       console.error("Worker error:", err);
@@ -107,11 +98,16 @@ async function start() {
   }
 }
 
-// health endpoint
+// ---------------------------
+// HEALTH ENDPOINT
+// ---------------------------
 app.get("/health", async (req, res) => {
   try {
-    const queueDepth = await redisClient.lLen("purchase-events");
-    const dlqDepth = await redisClient.lLen("fraud-dlq");
+    await redisClient.ping();
+    await db.query("SELECT 1");
+
+    const queueDepth = await redisClient.lLen(QUEUE_NAME);
+    const dlqDepth = await redisClient.lLen(DLQ_NAME);
 
     res.status(200).json({
       status: "ok",
@@ -123,11 +119,16 @@ app.get("/health", async (req, res) => {
       dlqDepth,
       lastJobAt
     });
-  } catch {
-    res.status(503).json({ status: "error" });
+
+  } catch (err) {
+    res.status(503).json({
+      status: "error",
+      error: err.message
+    });
   }
 });
 
+// start server + worker
 app.listen(PORT, () => {
   console.log("Health server running on port", PORT);
 });
