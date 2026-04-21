@@ -33,9 +33,9 @@ Every worker will have a dead letter queue by the end of the sprint. The worker 
 ### [Julia]
 
 - [ ] Finish full implementation of payment-service endpoint calls (enabling refund etc)
-- [ ]Implement failure prevention of seats hanging when refunding.
-- [ ]Ensure no seat dangling if payment fails in purchase-service (test or help maria implement)
-- [ ]Update readme.md
+- [ ] Implement failure prevention of seats hanging when refunding.
+- [ ] Ensure no seat dangling if payment fails in purchase-service (test or help maria implement)
+- [ ] Update readme.md
 
 
 ### [Katelyn]
@@ -48,44 +48,43 @@ Every worker will have a dead letter queue by the end of the sprint. The worker 
 ### [Ri]
 
 - [ ] Implement dead letter queue for notification worker
-- [ ]Update ReadMe for notification worker
-- [ ]Move worker functions to service 
+- [ ] Update ReadMe for notification worker
+- [ ] Move worker functions to service 
 
 ### [Helektra]
-- [ ]Update readme.md 
-- [ ]Implement DLQ
-- [ ]Implement GET /analytics querying real data from event_stats
-- [ ]Verify docker compose ps 
+- [ ] Update readme.md 
+- [ ] Implement DLQ
+- [ ] Implement GET /analytics querying real data from event_stats
+- [ ] Verify docker compose ps 
 
 ### [Maria]
-- [ ]Implement DLQ 
-- [ ]Update ReadMe
+- [ ] Implement DLQ 
+- [ ] Update ReadMe
 - [ ] Implement seat reservations in ticket-purchase-service
 
 ### [Tien]
-- [ ]Update readme.md 
-- [ ]Implement DLP
-- [ ]Debug so that health endpoint is working
+- [ ] Update readme.md 
+- [ ] Implement DLP
+- [ ] Debug so that health endpoint is working
 
 ### [Vinnie]
-- [ ]K6 poison pill test
-- [ ]Refund service request fully implemented
-- [ ]Check purchase to make sure it exists
-- [ ]Actually write to database
-- [ ]Call to payment’s /reverse endpoint
-- [ ]Update readme.md 
-- [ ]Sprint 3 Report
+- [ ] K6 poison pill test
+- [ ] Refund service request fully implemented
+- [ ] Check purchase to make sure it exists
+- [ ] Actually write to database
+- [ ] Call to payment’s /reverse endpoint
+- [ ] Update readme.md 
+- [ ] Sprint 3 Report
 
 ### [Benson]
-- [ ]Update readme.md 
-- [ ]FInish up event-catalog services
-- [ ]Work on a failure case for event-catalog
+- [ ] Update readme.md 
+- [ ] FInish up event-catalog services
+- [ ]W ork on a failure case for event-catalog
 
 ### [Franco]
--[ ]Update readme.md 
--[ ]Continue UI work and testing of the UI, update user ticket-booking UI to reflect event-catalog DB changes
--[ ]Add a dev UI dashboard for testing endpoints/core services
-
+-[ ] Update readme.md 
+-[ ] Continue UI work and testing of the UI, update user ticket-booking UI to reflect event-catalog DB changes
+-[ ] Add a dev UI dashboard for testing endpoints/core services
 
 ---
 
