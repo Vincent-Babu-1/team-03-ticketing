@@ -82,9 +82,9 @@ Every worker will have a dead letter queue by the end of the sprint. The worker 
 - [ ]W ork on a failure case for event-catalog
 
 ### [Franco]
--[ ] Update readme.md 
--[ ] Continue UI work and testing of the UI, update user ticket-booking UI to reflect event-catalog DB changes
--[ ] Add a dev UI dashboard for testing endpoints/core services
+- [ ] Update readme.md 
+- [ ] Continue UI work and testing of the UI, update user ticket-booking UI to reflect event-catalog DB changes
+- [ ] Add a dev UI dashboard for testing endpoints/core services
 
 ---
 
