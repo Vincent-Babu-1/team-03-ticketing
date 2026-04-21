@@ -1,8 +1,9 @@
 CREATE TABLE IF NOT EXISTS events (
-  id  UUID  PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
-  price NUMERIC(10,2) NOT NULL,
-  dateTime TIMESTAMPTZ,
-  description TEXT.
-  category TEXT,
+  venue TEXT NOT NULL,
+  base_price NUMERIC(10,2) NOT NULL,
+  date_time TIMESTAMPTZ NOT NULL,
+  description TEXT,
+  category TEXT
 );
