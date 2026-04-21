@@ -2,13 +2,19 @@ import express from 'express'
 import crypto from 'crypto'
 import { pool, checkDb, checkRedis } from './wait.js'
 
-const SIMULATED_SUCCESS_RATE = parseFloat(process.env.SIMULATED_SUCCESS_RATE || '1.0');
+const SIMULATED_SUCCESS_RATE = parseFloat(process.env.SIM_SUCCESS_RATE || '1.0');
 const PORT = 3001;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const app = express();
 app.use(express.json());
 console.log('payment-service: server initiated.')
+
+
+// http://localhost:3003/
+app.get("/", (req, res) => {
+  res.send("Hello World FROM payment-service");
+});
 
 // Health check: GET /health -- returns 200 if DB and Redis are both reachable, 503 if either is down.
 app.get('/health', async (req, res) => {
@@ -40,12 +46,18 @@ app.post("/payments", async(req, res) => {
 
     // check if paid already (if purchase_id already is linked to a payment, return original payment)
     const existing = await pool.query(
-        'SELECT * FROM payments WHERE purchase_id = $1',
-        [purchase_id]
+        'SELECT * FROM payments WHERE purchase_id = $1 AND status = $2',
+        [purchase_id, 'succeeded']
     );
     if (existing.rows.length > 0) {
         console.log(`payment-service: duplicate charge attempted for purchase: ${purchase_id}`)
-        return res.status(200).json(existing.rows[0]);
+        const existingPayment = existing.rows[0]
+        return res.status(200).json({
+            payment_id: existingPayment.id,
+            purchase_id: existingPayment.purchase_id,
+            status: existingPayment.status === "succeeded" ? "success" : "failed",
+            amount: (existingPayment.status === "succeeded" ? existingPayment.total_usd : 0)
+        });
     }
 
     // simulated payment processing: chance for failure of payment, chance of success.
@@ -84,3 +96,15 @@ app.post("/payments/reverse", async(req, res) => {
 app.listen(PORT, async () => {
   console.log(`ticket-payment-service running on port ${PORT}`);
 });
+
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS payments (
+    id UUID PRIMARY KEY,
+    purchase_id UUID NOT NULL,
+    refund_id UUID UNIQUE,
+    total_usd NUMERIC(10,2) NOT NULL CHECK (total_usd > 0),
+    status TEXT NOT NULL CHECK (status IN ('failed', 'refunded', 'succeeded')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);  
+`);

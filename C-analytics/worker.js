@@ -1,22 +1,29 @@
 // worker.js — Analytics Worker (Sprint 1)
 // Consumes purchase and browse events from the Redis analytics_queue and writes aggregate stats to the analytics DB
-
-import { popFromQueue } from './redis.js';
+import { createClient } from 'redis';
+import { popFromQueue } from '../redis.js';
 import pg from 'pg';
+import express from "express";
+
+const app = express();
+app.use(express.json());
+const PORT = 3007;
+const DATABASE_URL =
+  process.env.DATABASE_URL || "postgres://user:pass@analytics-db:5432/analyticsdb"
 
 const { Pool } = pg;
+const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
+const redisClient = createClient({ url: REDIS_URL });
+
+let lastJobAt = null;
 
 // Connect to the analytics DB using environment variables
 // set in compose.yml. The defaults match the compose.yml values
 const db = new Pool({
-  host:     process.env.DB_HOST,
-  port:     parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME,
-  user:     process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  connectionString:DATABASE_URL
 });
 
-const QUEUE = 'analytics_queue';
+const QUEUE = 'analytics-queue';
 
 async function run() {
   console.log('[analytics-worker] listening on', QUEUE);
@@ -77,7 +84,7 @@ async function run() {
         // Log and drop event rather than crashing the worker
         console.warn('[analytics-worker] malformed event, dropping:', event);
       }
-
+      lastJobAt = new Date().toISOString();
     } catch (err) {
       // If the DB or Redis has an error, wait 1 second and retry
       console.error('[analytics-worker] error:', err.message);
@@ -85,5 +92,43 @@ async function run() {
     }
   }
 }
+
+app.get("/health", async (req, res) => {
+  try {
+
+    if (!redisClient.isOpen) {
+      console.log("redis not open yet")
+      await redisClient.connect();
+      console.log("redis connected")
+    }
+    
+    await redisClient.ping();
+    await db.query("SELECT 1");
+
+    const queueDepth = await redisClient.lLen(QUEUE);
+    //const dlqDepth = await redisClient.lLen(DLQ_NAME);
+
+    res.status(200).json({
+      status: "ok",
+      checks: {
+        redis: "ok",
+        database: "ok"
+      },
+      queueDepth,
+      dlqDepth:0, //TODO: implement dlq
+      lastJobAt
+    });
+
+  } catch (err) {
+    res.status(503).json({
+      status: "error",
+      error: err.message
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log("Health server running on port", PORT);
+});
 
 run();
