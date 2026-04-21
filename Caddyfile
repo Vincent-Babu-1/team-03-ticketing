@@ -1,8 +1,14 @@
-# TODO: attach this to services that need distributing
-#   change service-1, service-2 etc to names of services as listed in compose.yml->services
+:80 {
+    root * /srv
+    file_server
 
-#:80 {
-#    reverse_proxy service-1:3000 service-2:3000 service-3:3000 {
-#        lb_policy round_robin
-#    }
-#}
+    handle /api/events* {
+        uri strip_prefix /api
+        reverse_proxy event-cat-service:3001
+    }
+
+    handle /api/purchases* {
+        uri strip_prefix /api
+        reverse_proxy purchase-service:3001
+    }
+}
