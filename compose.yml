@@ -221,6 +221,25 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+  
+  # WAITLIST WORKER:
+  waitlist-worker:
+    build: ./C-waitlist-worker
+    container_name: waitlist-worker
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - team-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   # ── Postgres template ──────────────────────────────────────────────────────
   #
