@@ -149,7 +149,7 @@ app.listen(port, () => {
 /*
 docker compose exec holmes bash
 
-k6 run /workspace/k6/sprint-2-async.js
+k6 run /workspace/k6/sprint-3-poison.js
 curl http://fraud-worker:3000/health | jq .
 
 mkdir -p results
