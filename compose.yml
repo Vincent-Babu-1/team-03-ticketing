@@ -277,6 +277,7 @@ services:
        - "5433:5432"
      volumes:
        - event-cat-db-data:/var/lib/postgresql/data
+       - ./DB-folder/DB-events-catalog.sql:/docker-entrypoint-initdb.d/DB-events-catalog.sql
      networks:
        - team-net
      healthcheck:
