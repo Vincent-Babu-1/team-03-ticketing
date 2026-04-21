@@ -18,13 +18,26 @@ const eventId = "event789";
 
 await redis.publish('confirmed-purchases', JSON.stringify({ purchaseId, userId, eventId }));
 
+async function connectWithRetry() {
+  while (true) {
+    try {
+      await redisClient.connect();
+      console.log("Connected to Redis");
+      break;
+    } catch (err) {
+      console.log("Redis not ready, retrying...");
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+}
+
 // health endpoint 
 app.get("/health", async (req, res) => {
   try {
     if (!redisClient.isOpen) {
-      console.log("redis not open yet")
+      console.log("redis not open yet");
       await redisClient.connect();
-      console.log("redis connected")
+      console.log("redis connected");
     }
     
     await redisClient.ping();
@@ -46,6 +59,9 @@ app.get("/health", async (req, res) => {
     });
   }
 });
+
+await connectWithRetry();
+
 app.listen(PORT, () => {
   console.log("Health server running on port", PORT);
 });
