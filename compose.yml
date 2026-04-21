@@ -369,11 +369,15 @@ services:
     image: caddy:2-alpine
     depends_on:
       - holmes
-      #TODO: change this to all the services that need distributing
+      - event-cat-service
+      - purchase-service
     ports:
       - "80:80"
+    networks:
+      - team-net
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./ui:/srv:ro
 # ── Named volumes ──────────────────────────────────────────────────────────────
 # Declare a volume for each database here, e.g.:
 #

@@ -4,12 +4,28 @@ import { createClient } from "redis";
 
 const data = [
         {
-            "id": 1,
+            "id": "00000000-0000-0000-0000-000000000101",
             "name": "Drake Concert",
-            "price": 2,
-            "dateTime": "2026-05-10",
-            "description": "Live concert",
+            "price": 102,
+            "dateTime": "2026-05-10T20:00:00Z",
+            "description": "Live arena concert with opening acts.",
             "category": "music"
+        },
+        {
+            "id": "00000000-0000-0000-0000-000000000102",
+            "name": "Wolverines Home Game",
+            "price": 68,
+            "dateTime": "2026-05-14T18:30:00Z",
+            "description": "Big game night with student section seating.",
+            "category": "sports"
+        },
+        {
+            "id": "00000000-0000-0000-0000-000000000103",
+            "name": "Spring Comedy Fest",
+            "price": 45,
+            "dateTime": "2026-05-21T19:30:00Z",
+            "description": "Stand-up showcase featuring national touring comics.",
+            "category": "comedy"
         }
     ]
 
