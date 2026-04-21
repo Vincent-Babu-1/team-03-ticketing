@@ -193,6 +193,14 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://notification-worker:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   # REFUND SERVICE:
   refund-service:
@@ -236,12 +244,13 @@ services:
     networks:
       - team-net
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://waitlist-worker:3000/health"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 15s
 
+  # FRAUD WORKER
   fraud-worker:
     build: ./C-fraud
     container_name: fraud-worker
@@ -254,13 +263,37 @@ services:
       - QUEUE_NAME=purchase-events
       - DLQ_NAME=fraud-dlq
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://fraud-worker:3008/health"]
     depends_on:
       fraud-db:
         condition: service_healthy
       redis:
         condition: service_healthy
     command: node worker.js
+
+  # ANALYTICS WORKER:
+  analytics-worker:
+    build:
+      context: .
+      dockerfile: ./C-analytics/Dockerfile
+    container_name: analytics-worker
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgres://user:pass@analytics-db:5432/analyticsdb
+    depends_on:
+      redis:
+        condition: service_healthy
+      analytics-db:
+        condition: service_healthy
+    networks:
+      - team-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://analytics-worker:3007/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     
   # ── Postgres template ──────────────────────────────────────────────────────
   #

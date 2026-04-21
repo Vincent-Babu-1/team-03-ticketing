@@ -20,8 +20,10 @@ const errorRate = new Rate("errors");
 // ── Configuration ─────────────────────────────────────────────────────────────
 // Update this URL to point to your main read endpoint.
 // From inside the holmes container, use the service name (not localhost).
-const TARGET_URL = "http://purchase-service:3001/purchases"; // NEW
-const TARGET_URL1 = "http://purchase-service:3001/purchases/"; // NEW
+//const TARGET_URL = "http://purchase-service:3001/purchases"; // OLD
+//const TARGET_URL1 = "http://purchase-service:3001/purchases/"; // OLD
+const TARGET_URL = "http://event-cat-service:3001/events"; // NEW
+const TARGET_URL1 = "http://event-cat-service:3001/events/"; // NEW
 
 function newUUID(){ 
   //return crypto.randomUUID(); 
@@ -43,6 +45,8 @@ export const options = {
 // Literally exactly the same as sprint 1's k6 test, except also get the inputted information;
 // comparison between the two will be done by hand afterwards
 
+// OLD
+/*
 export default function () {
   
   const data = {
@@ -67,6 +71,49 @@ export default function () {
   sleep(0.5);
 
   const getURL = TARGET_URL1 + res.json().purchaseId
+  const res1 = http.get(getURL);
+  
+  const ok1 = check(res1, {
+    "status is 200": (r) => r.status === 200,
+    "response time < 500ms": (r) => r.timings.duration < 500,
+  });
+  
+  errorRate.add((!ok) || (!ok1));
+  sleep(0.5);
+
+}
+
+*/
+
+
+//NEW
+
+export default function () {
+  const now = new Date().toISOString();
+  const data = {
+    name:"test-event-name",
+    venue:"test-event-name",
+    base_price:666,
+    date_time:now,
+    description:"test-description",
+    category:"test-category-name"
+  }
+
+  let res = http.post(TARGET_URL, JSON.stringify(data), {
+    headers: { 
+      'Content-Type': 'application/json',
+      'Idempotency-Key': newUUID()
+    },
+  });
+
+  const ok = check(res, {
+    "status is 200": (r) => r.status === 201,
+    "response time < 500ms": (r) => r.timings.duration < 500,
+  });
+  
+  sleep(0.5);
+
+  const getURL = TARGET_URL1 + res.json().id
   const res1 = http.get(getURL);
   
   const ok1 = check(res1, {

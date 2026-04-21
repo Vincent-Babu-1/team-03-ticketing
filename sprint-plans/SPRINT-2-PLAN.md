@@ -80,6 +80,12 @@ By the end of Spring 2, the Redis cache will be in use by event catalog service.
 ### [Franco]
 - [ ] Work on UI, touching core services, and database visualization.
 
+### [Vinnie]
+
+- [ ] Holmes and k6 check for GET and SET for Redis
+- [ ] K6 async comparison test
+- [ ] K6 cache comparison test
+
 ---
 
 ## Risks

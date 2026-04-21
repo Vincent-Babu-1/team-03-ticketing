@@ -1,11 +1,9 @@
-import redis from "redis";
-import pkg from "pg";
+import { createClient } from 'redis';
+import pg from "pg";
 import express from "express";
 
 const app = express();
-const PORT = 3000;
-
-const { Client } = pkg;
+const PORT = 3008;
 
 // ENV
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
@@ -17,8 +15,10 @@ const DLQ_NAME = "fraud-dlq";
 const PUBSUB_CHANNEL = "fraud-flagged";
 
 // Clients
-const redisClient = redis.createClient({ url: REDIS_URL });
-const db = new Client({ connectionString: DATABASE_URL });
+const redisClient = createClient({ url: REDIS_URL });
+const db = new pg.Pool({ connectionString: DATABASE_URL });
+
+
 
 // Tracking
 let lastJobAt = null;
@@ -102,12 +102,21 @@ async function start() {
 // HEALTH ENDPOINT
 // ---------------------------
 app.get("/health", async (req, res) => {
+  console.log("reached0")
   try {
+
+    if (!redisClient.isOpen) {
+      console.log("redis not open yet")
+      await redisClient.connect();
+      console.log("redis connected")
+    }
+    
     await redisClient.ping();
     await db.query("SELECT 1");
 
     const queueDepth = await redisClient.lLen(QUEUE_NAME);
     const dlqDepth = await redisClient.lLen(DLQ_NAME);
+    console.log("reached1")
 
     res.status(200).json({
       status: "ok",
@@ -121,6 +130,7 @@ app.get("/health", async (req, res) => {
     });
 
   } catch (err) {
+    console.log("health error: " + err.message)
     res.status(503).json({
       status: "error",
       error: err.message
@@ -132,5 +142,5 @@ app.get("/health", async (req, res) => {
 app.listen(PORT, () => {
   console.log("Health server running on port", PORT);
 });
-
+console.log("reached-1")
 start();

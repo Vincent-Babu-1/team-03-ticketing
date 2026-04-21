@@ -141,7 +141,7 @@ app.post('/refund-request', async (req, res) => {
   });
 });
 
-const port = process.env.PORT || 3005;
+const port = process.env.PORT || 3001;
 app.listen(port, () => {
   console.log(`Refund service listening on :${port}`);
 });
@@ -149,14 +149,19 @@ app.listen(port, () => {
 /*
 docker compose exec holmes bash
 
-k6 run /workspace/k6/sprint-2-cache.js
+k6 run /workspace/k6/sprint-2-async.js
+curl http://fraud-worker:3000/health | jq .
 
 mkdir -p results
-k6 run --summary-export results/k6-sprint-2-cache-output-initial-summary.json /workspace/k6/sprint-2-cache.js | tee results/k6-sprint-2-cache-output-initial.txt
+k6 run --summary-export results/k6-sprint-2-async-output-summary.json /workspace/k6/sprint-2-async.js | tee results/k6-sprint-2-async-output.txt
 
 healthcheck http://purchase-service:3001/health
 curl http://refund-service:3005/health | jq .
-curl http://purchase-service:3001/health | jq
+curl http://analytics-worker:3000/health | jq
+
+curl -s -X GET http://event-cat-service:3001/events/0e350ac0-a8f1-4a7a-9191-806716cc6181 \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" \
 
 curl -s -X POST http://refund-service:3005/refund-request \
   -H "Content-Type: application/json" \
