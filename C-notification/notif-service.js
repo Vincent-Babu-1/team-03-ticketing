@@ -1,29 +1,24 @@
 import express from 'express';
 import { waitForPg, waitForRedis } from './wait.js';
 import { createClient } from 'redis';
-const redis = createClient({ url: process.env.REDIS_URL || 'redis://redis:6379' });
-await waitForRedis(redis, 'posts');
+
+const CHANNEL = "confirmed-purchases";
 
 const app = express();
 app.use(express.json());
 
-app.get('/health', async (req, res) => {
-  try {
-    await redis.ping()
-    res.status(200).json({ ok: true, status: 'ok', service: 'notif-service' })
-  } catch {
-    console.log("no redis ping");
-    res.status(503).json({ ok: false, status: 'redis-not-ready', service: 'notif-service' })
-  }
-});
+const redis = createClient({ url: process.env.REDIS_URL || 'redis://redis:6379' });
+await waitForRedis(redis, 'posts');
+const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
+const redisClient = createClient({ url: REDIS_URL });
+const PORT = 3001;
+let lastJobAt = null;
 
-const CHANNEL = "confirmed-purchases";
 
 async function startWorker() {
   console.log("Notification worker starting...");
 
-
-  // 2. subscribe AFTER connection
+  // subscribe AFTER connection
   await redisSubscriber.subscribe(CHANNEL, (message) => {
     try {
       const data = JSON.parse(message);
@@ -34,13 +29,14 @@ async function startWorker() {
       // simulate email sending
       const emailLog = `
         === EMAIL SENT ===
-        To: ${data.email}
+        To: ${data.userId}
         Subject: Purchase Confirmation
-        Body: Your purchase of ${data.item} is confirmed.
+        Body: Your purchase of ${data.purchaseId} for event ${data.eventId} is confirmed.
         ==================
-        `;
+      `;
 
       console.log(emailLog);
+      lastJobAt = new Date().toISOString();
 
       // optional file log
       // fs.appendFileSync("emails.log", emailLog);
@@ -56,9 +52,19 @@ async function startWorker() {
   process.stdin.resume();
 }
 
+app.get('/health', async (req, res) => {
+  try {
+    await redis.ping()
+    res.status(200).json({ ok: true, status: 'ok', service: 'notif-service' })
+  } catch {
+    console.log("no redis ping");
+    res.status(503).json({ ok: false, status: 'redis-not-ready', service: 'notif-service' })
+  }
+});
+
 // startup safety
 startWorker().catch((err) => {
-  console.error("🔥 Worker failed to start:", err);
+  console.error("Worker failed to start:", err);
   process.exit(1);
 });
 
