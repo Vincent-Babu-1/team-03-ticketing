@@ -7,13 +7,13 @@ export const redis = createClient({url: process.env.REDIS_URL || "redis://redis:
 export async function checkDb() {
   const client = await pool.connect();
   await client.query('SELECT 1');
-  console.log(`payment-service: payment database connected`);
+  //console.log(`payment-service: payment database connected`); //to not clog logs
   client.release();
 }
 
 export async function checkRedis() {
     await redis.ping();
-    console.log(`payment-service: redis connected`);
+    //console.log(`payment-service: redis connected`); //to not clog logs
 }
 
 await redis.connect();

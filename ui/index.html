@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TicketFlow</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <h1>Book tickets without leaving the demo.</h1>
+      <p class="hero-copy">
+        Browse available events, pick one, and submit a ticket purchase through the live services.
+      </p>
+    </section>
+
+    <section class="content-grid">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Events</h2>
+          <button id="refresh-button" class="ghost-button" type="button">Refresh</button>
+        </div>
+        <p id="events-status" class="status-text">Loading events...</p>
+        <div id="events-list" class="event-list"></div>
+      </section>
+
+      <section class="panel checkout-panel">
+        <div class="panel-header">
+          <h2>Checkout</h2>
+        </div>
+
+        <div id="selected-event" class="selected-event empty-state">
+          Select an event to start your purchase.
+        </div>
+
+        <form id="purchase-form" class="purchase-form">
+          <label>
+            Your name
+            <input id="user-name" name="userName" type="text" placeholder="Alex Morgan" required>
+          </label>
+
+          <label>
+            Ticket quantity
+            <input id="quantity" name="quantity" type="number" min="1" max="8" value="1" required>
+          </label>
+
+          <label>
+            Card token
+            <input id="card-token" name="cardToken" type="text" placeholder="tok-demo-visa" required>
+          </label>
+
+          <button id="purchase-button" class="primary-button" type="submit" disabled>
+            Purchase Tickets
+          </button>
+        </form>
+
+        <div id="purchase-result" class="result-card hidden" aria-live="polite"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

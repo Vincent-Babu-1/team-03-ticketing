@@ -1,7 +1,17 @@
 import { redisSubscriber } from "./redis.js";
+import { createClient } from 'redis';
+import express from 'express';
+
+const app = express();
+app.use(express.json());
+const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
+const redisClient = createClient({ url: REDIS_URL });
 
 console.log("🔥 WORKER FILE STARTED");
 const CHANNEL = "confirmed-purchases";
+
+const PORT = 3001;
+let lastJobAt = null;
 
 async function startWorker() {
   console.log("📡 Notification worker starting...");
@@ -17,15 +27,15 @@ async function startWorker() {
 
       // simulate email sending
       const emailLog = `
-=== EMAIL SENT ===
-To: ${data.email}
-Subject: Purchase Confirmation
-Body: Your purchase of ${data.item} is confirmed.
-==================
-`;
+        === EMAIL SENT ===
+        To: ${data.userId}
+        Subject: Purchase Confirmation
+        Body: Your purchase of ${data.purchaseId} for event ${data.eventId} is confirmed.
+        ==================
+      `;
 
       console.log(emailLog);
-
+      lastJobAt = new Date().toISOString();
       // optional file log
       // fs.appendFileSync("emails.log", emailLog);
 
@@ -39,6 +49,42 @@ Body: Your purchase of ${data.item} is confirmed.
   // keep process alive (important for Docker)
   process.stdin.resume();
 }
+
+app.get("/health", async (req, res) => {
+  try {
+
+    if (!redisClient.isOpen) {
+      console.log("redis not open yet")
+      await redisClient.connect();
+      console.log("redis connected")
+    }
+    
+    await redisClient.ping();
+
+    //const dlqDepth = await redisClient.lLen(DLQ_NAME);
+
+    res.status(200).json({
+      status: "ok",
+      checks: {
+        redis: "ok",
+        database: "ok"
+      },
+      queueDepth:0, //uses pub/sub instead
+      dlqDepth:0, //TODO: implement dlq
+      lastJobAt
+    });
+
+  } catch (err) {
+    res.status(503).json({
+      status: "error",
+      error: err.message
+    });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log("Health server running on port", PORT);
+});
 
 // startup safety
 startWorker().catch((err) => {

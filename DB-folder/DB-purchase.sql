@@ -1,5 +1,3 @@
--- SPEC STATES: TICKET PURCHASE EXCLUSIVELY OWNS PURCHASE DB
-
 -- QUESTIONS/NOTES:
 -- Do we add or remove things that reference other databases (other .sql files)?
 -- Do we add event_id to reservations to avoid having to run joins for that info?
@@ -18,7 +16,7 @@ CREATE TABLE IF NOT EXISTS purchases (
 );
 
 CREATE TABLE IF NOT EXISTS reservations (
-    id UUID PRIMARY KEY, -- maybe serial?
+    id UUID PRIMARY KEY,
     purchase_id UUID NOT NULL,
     event_id UUID NOT NULL,
     seat_id UUID NOT NULL,
@@ -28,8 +26,8 @@ CREATE TABLE IF NOT EXISTS reservations (
 );
 
 CREATE TABLE IF NOT EXISTS payments (
-    id UUID PRIMARY KEY, -- maybe serial?
-    purchase_id UUID NOT NULL UNIQUE,
+    id UUID PRIMARY KEY, 
+    purchase_id UUID NOT NULL,
     refund_id UUID UNIQUE,
     total_usd NUMERIC(10,2) NOT NULL CHECK (total_usd > 0),
     status TEXT NOT NULL CHECK (status IN ('failed', 'refunded', 'succeeded')),
