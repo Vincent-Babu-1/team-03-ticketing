@@ -113,7 +113,7 @@ app.post('/refund-request', async (req, res) => {
     })
     await redis.hIncrBy(jobKey(refundRequestId), 'duplicateSkips', 1)
     console.log(`pipeline=${pipeline} job=${refundRequestId} duplicate-skipped`)
-    return res.status(400).json({
+    return res.status(404).json({
       refundRequestId:refundRequestId, 
       purchaseId:purchaseId, 
       success:false,
@@ -141,7 +141,7 @@ app.post('/refund-request', async (req, res) => {
       'INSERT INTO refunds (refundRequestId, purchaseId, success, failureReason) VALUES ($1, $2, $3, $4) RETURNING *',
       [refundRequestId, purchaseId, false, "purchase_missing"]
     );
-    return res.status(404).json({
+    return res.status(400).json({
       refundRequestId:refundRequestId, 
       purchaseId:purchaseId, 
       success:false,
@@ -156,7 +156,7 @@ app.post('/refund-request', async (req, res) => {
   );
   if (exists.rows.length > 0) {
     console.log(`refund service already refunded purchase ${purchaseId}, skipping`);
-    return res.status(400).json({
+    return res.status(202).json({
       refundRequestId:refundRequestId, 
       purchaseId:purchaseId, 
       success:false,
