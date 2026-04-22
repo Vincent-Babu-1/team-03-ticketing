@@ -11,6 +11,8 @@ app.use(express.json());
 
 const CHANNEL = "seat-released";
 const queueName = process.env.QUEUE_NAME || 'refundRequests'
+const CHECK_PURCHASE_URL = process.env.CHECK_PURCHASE_URL || 'http://purchase-service:3001/purchases/'
+const REVERSE_PAYMENT_URL = process.env.REVERSE_PAYMENT_URL || 'http://payment-service:3001/reverse'
 const pipeline = process.env.PIPELINE || 'team-03'
 const ttlSec = Number(process.env.IDEM_TTL_SEC || '86400')
 
@@ -35,19 +37,25 @@ function processedKey(refundId) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function applySideEffect(refundRequestId, purchaseId) {
-  /* TODO
 
   // edit database
   const result = await pool.query(
-    'INSERT INTO refunds (refundRequestId, purchaseId, success) VALUES ($1, $2) RETURNING *',
-    [refundRequestId, purchaseId, true]
+    'INSERT INTO refunds (refundRequestId, purchaseId, success, failureReason) VALUES ($1, $2, $3, $4) RETURNING *',
+    [refundRequestId, purchaseId, true, ""]
   );
   const post = result.rows[0];
 
-  //publish on REDIS
-  await publish(CHANNEL,post);
+  //TODO: contact POST http://payment-service:3001/reverse with purchaseId
 
-  */
+  await axios.post(REVERSE_PAYMENT_URL, {
+    purchaseId:purchaseId,
+    refundRequestId:refundRequestId //in case you need it
+  }).then(response => {
+    console.log("purchase",purchaseId, "payment reversed!");
+  }).catch(error => {
+    console.error('Error in refunds: error signalling for payment reversal', error);
+  });
+
   const delayMs = 1000;
   await sleep(delayMs)
 
@@ -78,7 +86,7 @@ app.get('/health', async (req, res) => {
 });
 
 app.post('/refund-request', async (req, res) => {
-
+  console.log("received refund request")
   //Extract information
   const { refundRequestId , purchaseId  } = req.body;
 
@@ -105,25 +113,58 @@ app.post('/refund-request', async (req, res) => {
     })
     await redis.hIncrBy(jobKey(refundRequestId), 'duplicateSkips', 1)
     console.log(`pipeline=${pipeline} job=${refundRequestId} duplicate-skipped`)
-    res.status(400).json({
+    return res.status(400).json({
       refundRequestId:refundRequestId, 
       purchaseId:purchaseId, 
       success:false,
-      duplicate:true
+      failureReason:"idempotency_skip"
     });
-    return;
   }
 
-  /* TODO
-
-  Check with ticket purchase to see if purchaseId exists and if is complete 
-  const { data } = await axios.post('http://purchase-service:3002/purchaseOrSomething', req.body);
-
-  if purchase doesn't exist or is still processing:
+  //Check with ticket purchase to see if purchaseId exists and if is complete 
+  let purchaseExists = false
+  await axios.get(CHECK_PURCHASE_URL+purchaseId).then(response => {
+    console.log("got data:", response.data);
+    purchaseExists = true;
+  }).catch(error => {
+    if (error.status==404) {
+      purchaseExists = false;
+    }
+    else{
+      purchaseExists = false;
+      console.error('Error in refunds: error fetching purchase data:', error);
+    }
+  });
+  if (!purchaseExists) {
     console.log(`pipeline=${pipeline} job=${refundRequestId} purchase not found`)
-    return error 404
+    const result = await pool.query(
+      'INSERT INTO refunds (refundRequestId, purchaseId, success, failureReason) VALUES ($1, $2, $3, $4) RETURNING *',
+      [refundRequestId, purchaseId, false, "purchase_missing"]
+    );
+    return res.status(404).json({
+      refundRequestId:refundRequestId, 
+      purchaseId:purchaseId, 
+      success:false,
+      failureReason:"purchase_missing"
+    });
+  }
 
-  */
+  // Check refund database to see if this purchase has been reversed already by someone else
+  const exists = await pool.query(
+    'SELECT 1 FROM refunds WHERE purchaseId = $1',
+    [purchaseId]
+  );
+  if (exists.rows.length > 0) {
+    console.log(`refund service already refunded purchase ${purchaseId}, skipping`);
+    return res.status(400).json({
+      refundRequestId:refundRequestId, 
+      purchaseId:purchaseId, 
+      success:false,
+      failureReason:"already_refunded"
+    });
+  }
+
+  // All OK! go through with refund
   const { delayMs, effectCount } = await applySideEffect(refundRequestId, purchaseId)
   const doneAt = new Date().toISOString()
   await redis.hSet(jobKey(refundRequestId), {
@@ -146,27 +187,46 @@ app.listen(port, () => {
   console.log(`Refund service listening on :${port}`);
 });
 
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS refunds (
+    refundRequestId TEXT NOT NULL,
+    purchaseId TEXT NOT NULL, 
+    success BOOLEAN NOT NULL,
+    failureReason TEXT NOT NULL
+  );
+`);
+
 /*
 docker compose exec holmes bash
 
 k6 run /workspace/k6/sprint-3-poison.js
 curl http://fraud-worker:3000/health | jq .
 
+psql postgres://user:pass@refund-db:5432/refunddb
+psql postgres://user:pass@purchase-db:5432/purchasedb
+
+SELECT table_name
+  FROM information_schema.tables
+ WHERE table_schema='public'
+   AND table_type='BASE TABLE';
+
+SELECT * FROM refunds;
+
 mkdir -p results
 k6 run --summary-export results/k6-sprint-2-async-output-summary.json /workspace/k6/sprint-2-async.js | tee results/k6-sprint-2-async-output.txt
 
 healthcheck http://purchase-service:3001/health
-curl http://refund-service:3005/health | jq .
+curl http://refund-service:3001/health | jq .
 curl http://analytics-worker:3000/health | jq
 
 curl -s -X GET http://event-cat-service:3001/events/0e350ac0-a8f1-4a7a-9191-806716cc6181 \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" \
 
-curl -s -X POST http://refund-service:3005/refund-request \
+curl -s -X POST http://refund-service:3001/refund-request \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" \
-  -d '{"refundRequestId": "refund-004", "purchaseId": "purchase-001"}' | jq .
+  -H "Idempotency-Key: -9c0b-4ef8-bb6d-6bb9bd386666" \
+  -d '{"refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776", "purchaseId": "df33337e-9fac-4854-9ad8-3af18d822cfc"}' | jq .
 
 curl -s -X POST http://payment-service:3001/payments \
   -H "Content-Type: application/json" \
@@ -175,6 +235,7 @@ curl -s -X POST http://payment-service:3001/payments \
 
 curl -s -X POST http://purchase-service:3001/purchases \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" \
-  -d '{"purchaseId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", "userId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", "eventId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", "quantity": 2, "cardToken": "test-card-1"}' | jq .
+  -H "Idempotency-Key: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12" \
+  -d '{"userId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", "eventId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", "quantity": 2, "cardToken": "test-card-1"}' | jq .
+
 */

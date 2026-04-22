@@ -219,6 +219,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - PIPELINE=team-03
       - QUEUE_NAME=refundRequests
+      - CHECK_PURCHASE_URL=http://purchase-service:3001/purchases/
+      - REVERSE_PAYMENT_URL=http://payment-service:3001/reverse
     depends_on:
       refund-db:
         condition: service_healthy
