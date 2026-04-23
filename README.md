@@ -70,7 +70,7 @@ Include which service calls which, what queues exist, and how data flows.]
 
 [Each of us can add to this paragraph with our section of the system.]
 
-Refund requests are sent to the Refund service, which checks the Refund database and synchronously calls the Purchase service to determine whether the request is valid. If the request is valid, then the request is noted in the database as successful and the Payment service is contacted to reverse the charge.
+Refund requests are sent to the Refund service, which checks the Refund database and synchronously calls the Purchase service to determine whether the request is valid. If the request is valid, then the request is noted in the Refund database as successful and the Payment service is contacted to reverse the charge.
 
 
 ---
