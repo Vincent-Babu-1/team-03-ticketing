@@ -1,15 +1,12 @@
 {
-  "name": "analytics-worker",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "worker.js",
-  "private": false,
-  "scripts": {
-    "start": "node worker.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "pg": "^8.11.0",
-    "redis": "^4.6.0"
+    "name": "analytics-worker",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "worker.js",
+    "private": true,
+    "dependencies": {
+      "express": "^4.18.2",
+      "pg": "^8.11.0",
+      "redis": "^4.6.0"
+    }
   }
-}
