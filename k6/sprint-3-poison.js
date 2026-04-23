@@ -29,7 +29,7 @@ const poison1 = { //deformed purchaseId
 const poison2 = { //missing fields
     purchaseId: newUUID(),
     eventId: newUUID(),
-    cardToken: "test-card-X"
+    cardToken: "test-card-Y"
 }
 
 export default function () {
@@ -63,8 +63,15 @@ export default function () {
           "status is 200": (r) => r.status === 202,
           "response time < 500ms": (r) => r.timings.duration < 500,
         });
-    } else {
-        let res = http.post(TARGET_URL, JSON.stringify(poison1), {
+    } else { // bad idempotency key
+        const data = {
+          purchaseId: newUUID(),
+          userId: newUUID(),
+          eventId: newUUID(),
+          quantity: 2,
+          cardToken: "test-card-Z"
+        }
+        let res = http.post(TARGET_URL, JSON.stringify(data), {
         headers: { 
             'Content-Type': 'application/json',
             'Idempotency-Key': "haha-poison-idem"
