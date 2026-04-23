@@ -291,7 +291,7 @@ services:
     networks:
       - team-net
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://analytics-worker:3007/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://analytics-worker:3001/health"]
       interval: 10s
       timeout: 5s
       retries: 3
