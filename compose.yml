@@ -48,7 +48,7 @@ services:
       - team-net
     environment:
       - TERM=xterm-256color
-    # Holmes has no ports — access it via: docker compose exec holmes bash
+    # Holmes has no port`s — access it via: docker compose exec holmes bash
 
   # ── Add your services here ─────────────────────────────────────────────────
   #
@@ -191,6 +191,8 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
     depends_on:
+      notification-service:
+        condition: service_healthy
       redis:
         condition: service_healthy
       notification-service:
