@@ -9,6 +9,11 @@ app.use(express.json());
 const PORT = 3001;
 const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3001';
 
+// http://localhost:3002/
+app.get("/", (req, res) => {
+  res.send("Hello World FROM purchase-service");
+});
+
 // ── GET /health ──────────────────────────────────────────────────────────────
 // Returns 200 if DB and Redis are both reachable, 503 if either is down
 app.get('/health', async (req, res) => {
@@ -67,8 +72,14 @@ app.post('/purchases', async (req, res) => {
     [idempotencyKey]
   );
   if (existing.rows.length > 0) {
-    console.log(`purchase ${idempotencyKey} is valid but not unique`);
-    return res.status(200).json(existing.rows[0]);
+    const existingPurchase = existing.rows[0]
+    if (existingPurchase.status === "confirmed" || existingPurchase.status === "failed") {
+      console.log(`purchase ${idempotencyKey} is valid but not unique, returning purchase`);
+      return res.status(200).json(existingPurchase);
+    } else if (existingPurchase.status === "pending") {
+      console.log(`purchase ${idempotencyKey} is valid but not unique, still processing`);
+      return res.status(202).json(existingPurchase)
+    }
   }
 
   console.log(`purchase ${idempotencyKey} is valid and unique`);
@@ -170,4 +181,16 @@ await pool.query(`
     status          TEXT NOT NULL DEFAULT 'pending',
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )
+`);
+
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS reservations (
+    id UUID PRIMARY KEY, -- maybe serial?
+    purchase_id UUID NOT NULL,
+    event_id UUID NOT NULL,
+    seat_id UUID NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('released', 'pending', 'confirmed')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 `);

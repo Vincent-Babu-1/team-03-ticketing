@@ -1,7 +1,11 @@
 FROM node:20-alpine
 
-WORKDIR /C-ticket-purchase
+WORKDIR /app
 
-COPY worker.js .
+COPY package.json ./
+
+RUN npm install
+
+COPY . .
 
 CMD ["node", "worker.js"]
