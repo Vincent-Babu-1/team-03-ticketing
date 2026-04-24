@@ -199,7 +199,7 @@ await pool.query(`
 /*
 docker compose exec holmes bash
 
-k6 run /workspace/k6/sprint-3-poison.js
+k6 run /workspace/k6/sprint-2-cache.js
 curl http://fraud-worker:3000/health | jq .
 
 psql postgres://user:pass@refund-db:5432/refunddb
