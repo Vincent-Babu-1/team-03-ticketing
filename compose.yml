@@ -117,6 +117,7 @@ services:
     environment:
       - DATABASE_URL=postgres://user:pass@purchase-db:5432/purchasedb
       - REDIS_URL=redis://redis:6379
+      - PAYMENT_SERVICE_URL=http://payment-service:3001
     depends_on:
       purchase-db:
         condition: service_healthy
