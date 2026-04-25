@@ -1,4 +1,4 @@
-import express from "express"
+import express from "express";
 import pg from "pg";
 import { createClient } from "redis";
 
@@ -18,7 +18,6 @@ await pool.query("SELECT 1");
 console.log("Connected to Postgres");
 
 const app = express();
-
 const PORT = 3001;
 
 app.use(express.json());
@@ -27,7 +26,107 @@ app.get("/", (req, res) => {
   res.send("You've reached the event catalog server");
 });
 
-//seats
+// populate an event with sections and seats
+app.post("/events/:eventId/populate", async (req, res) => {
+  const { eventId } = req.params;
+  const { basePrice, capacity, sectionNames } = req.body;
+
+  const createdSections = [];
+
+  const client = await pool.connect();
+
+  try {
+    if (basePrice == null || capacity == null) {
+      return res.status(400).json({
+        error: "basePrice and capacity are required"
+      });
+    }
+
+    if (capacity <= 0) {
+      return res.status(400).json({
+        error: "capacity must be greater than 0"
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const eventResult = await client.query(
+      `
+      SELECT id
+      FROM events
+      WHERE id = $1
+      `,
+      [eventId]
+    );
+
+    if (eventResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    for (let i = 0; i < sectionNames.length; i++) {
+      const sectionName = sectionNames[i];
+
+      const sectionResult = await client.query(
+        `
+        INSERT INTO event_sections (
+          event_id,
+          section_name,
+          price,
+          capacity
+        )
+        VALUES ($1, $2, $3, $4)
+        RETURNING *
+        `,
+        [eventId, sectionName, basePrice, capacity]
+      );
+
+      const section = sectionResult.rows[0];
+      const createdSeats = [];
+
+      for (let seatNum = 1; seatNum <= capacity; seatNum++) {
+        const seatResult = await client.query(
+          `
+          INSERT INTO seats (
+            section_id,
+            row,
+            seat_number
+          )
+          VALUES ($1, $2, $3)
+          RETURNING *
+          `,
+          [section.id, sectionName, seatNum]
+        );
+
+        createdSeats.push(seatResult.rows[0]);
+      }
+
+      createdSections.push({
+        ...section,
+        seats: createdSeats
+      });
+    }
+
+    await client.query("COMMIT");
+
+    return res.status(201).json({
+      message: "Event populated successfully",
+      eventId,
+      sections: createdSections
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Failed to populate event:", err);
+
+    return res.status(500).json({
+      error: "Internal server error"
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// seats
 app.get("/events/:eventId/seats", async (req, res) => {
   const { eventId } = req.params;
 
@@ -37,7 +136,7 @@ app.get("/events/:eventId/seats", async (req, res) => {
       SELECT s.*
       FROM seats s
       JOIN event_sections es ON s.section_id = es.id
-      WHERE s.event_id = $1
+      WHERE es.event_id = $1
       ORDER BY es.section_name ASC, s.row ASC, s.seat_number ASC
       `,
       [eventId]
@@ -56,10 +155,11 @@ app.get("/events/:eventId/sections/:sectionId/seats", async (req, res) => {
   try {
     const result = await pool.query(
       `
-      SELECT *
-      FROM seats
-      WHERE event_id = $1 AND section_id = $2
-      ORDER BY row ASC, seat_number ASC
+      SELECT s.*
+      FROM seats s
+      JOIN event_sections es ON s.section_id = es.id
+      WHERE es.event_id = $1 AND s.section_id = $2
+      ORDER BY s.row ASC, s.seat_number ASC
       `,
       [eventId, sectionId]
     );
@@ -77,9 +177,10 @@ app.get("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res) =
   try {
     const result = await pool.query(
       `
-      SELECT *
-      FROM seats
-      WHERE id = $1 AND event_id = $2 AND section_id = $3
+      SELECT s.*
+      FROM seats s
+      JOIN event_sections es ON s.section_id = es.id
+      WHERE s.id = $1 AND es.event_id = $2 AND s.section_id = $3
       `,
       [seatId, eventId, sectionId]
     );
@@ -97,12 +198,12 @@ app.get("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res) =
 
 app.post("/events/:eventId/sections/:sectionId/seats", async (req, res) => {
   const { eventId, sectionId } = req.params;
-  const { row, seat_number, status } = req.body;
+  const { row, seat_number, status = "available" } = req.body ?? {};
 
   try {
-    if (!row || seat_number == null || !status) {
+    if (!row || seat_number == null) {
       return res.status(400).json({
-        error: "row, seat_number, and status are required"
+        error: "row and seat_number are required"
       });
     }
 
@@ -128,20 +229,16 @@ app.post("/events/:eventId/sections/:sectionId/seats", async (req, res) => {
     const result = await pool.query(
       `
       INSERT INTO seats (
-        event_id,
         section_id,
         row,
         seat_number,
         status
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4)
       RETURNING *
       `,
-      [eventId, sectionId, row, seat_number, status]
+      [sectionId, row, seat_number, status]
     );
-
-    await redis.del(`events:${eventId}`);
-    await redis.del(EVENTS_LIST_KEY);
 
     return res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -152,14 +249,15 @@ app.post("/events/:eventId/sections/:sectionId/seats", async (req, res) => {
 
 app.put("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res) => {
   const { eventId, sectionId, seatId } = req.params;
-  const { row, seat_number, status } = req.body;
+  const { row, seat_number, status } = req.body ?? {};
 
   try {
     const existingResult = await pool.query(
       `
-      SELECT *
-      FROM seats
-      WHERE id = $1 AND event_id = $2 AND section_id = $3
+      SELECT s.*
+      FROM seats s
+      JOIN event_sections es ON s.section_id = es.id
+      WHERE s.id = $1 AND es.event_id = $2 AND s.section_id = $3
       `,
       [seatId, eventId, sectionId]
     );
@@ -187,17 +285,10 @@ app.put("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res) =
         row = $1,
         seat_number = $2,
         status = $3
-      WHERE id = $4 AND event_id = $5 AND section_id = $6
+      WHERE id = $4 AND section_id = $5
       RETURNING *
       `,
-      [
-        updatedRow,
-        updatedSeatNumber,
-        updatedStatus,
-        seatId,
-        eventId,
-        sectionId
-      ]
+      [updatedRow, updatedSeatNumber, updatedStatus, seatId, sectionId]
     );
 
     return res.status(200).json(result.rows[0]);
@@ -211,18 +302,28 @@ app.delete("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res
   const { eventId, sectionId, seatId } = req.params;
 
   try {
-    const result = await pool.query(
+    const existingResult = await pool.query(
       `
-      DELETE FROM seats
-      WHERE id = $1 AND event_id = $2 AND section_id = $3
-      RETURNING *
+      SELECT s.*
+      FROM seats s
+      JOIN event_sections es ON s.section_id = es.id
+      WHERE s.id = $1 AND es.event_id = $2 AND s.section_id = $3
       `,
       [seatId, eventId, sectionId]
     );
 
-    if (result.rows.length === 0) {
+    if (existingResult.rows.length === 0) {
       return res.status(404).json({ error: "Seat not found" });
     }
+
+    const result = await pool.query(
+      `
+      DELETE FROM seats
+      WHERE id = $1 AND section_id = $2
+      RETURNING *
+      `,
+      [seatId, sectionId]
+    );
 
     return res.status(200).json({
       message: "Seat deleted successfully",
@@ -234,17 +335,21 @@ app.delete("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res
   }
 });
 
-//event sections
+// event sections
 app.get("/events/:eventId/sections", async (req, res) => {
   const { eventId } = req.params;
 
   try {
     const result = await pool.query(
       `
-      SELECT *
-      FROM event_sections
-      WHERE event_id = $1
-      ORDER BY section_name ASC
+      SELECT
+        es.*,
+        COUNT(s.id) FILTER (WHERE s.status = 'available') AS seats_available
+      FROM event_sections es
+      LEFT JOIN seats s ON s.section_id = es.id
+      WHERE es.event_id = $1
+      GROUP BY es.id
+      ORDER BY es.section_name ASC
       `,
       [eventId]
     );
@@ -262,9 +367,13 @@ app.get("/events/:eventId/sections/:sectionId", async (req, res) => {
   try {
     const result = await pool.query(
       `
-      SELECT *
-      FROM event_sections
-      WHERE id = $1 AND event_id = $2
+      SELECT
+        es.*,
+        COUNT(s.id) FILTER (WHERE s.status = 'available') AS seats_available
+      FROM event_sections es
+      LEFT JOIN seats s ON s.section_id = es.id
+      WHERE es.id = $1 AND es.event_id = $2
+      GROUP BY es.id
       `,
       [sectionId, eventId]
     );
@@ -282,7 +391,7 @@ app.get("/events/:eventId/sections/:sectionId", async (req, res) => {
 
 app.post("/events/:eventId/sections", async (req, res) => {
   const { eventId } = req.params;
-  const { section_name, price, capacity } = req.body;
+  const { section_name, price, capacity } = req.body ?? {};
 
   try {
     if (!section_name || price == null) {
@@ -310,16 +419,13 @@ app.post("/events/:eventId/sections", async (req, res) => {
         event_id,
         section_name,
         price,
-        capacity,
+        capacity
       )
       VALUES ($1, $2, $3, $4)
       RETURNING *
       `,
       [eventId, section_name, price, capacity]
     );
-
-    await redis.del(`events:${eventId}`);
-    await redis.del(EVENTS_LIST_KEY);
 
     return res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -330,7 +436,7 @@ app.post("/events/:eventId/sections", async (req, res) => {
 
 app.put("/events/:eventId/sections/:sectionId", async (req, res) => {
   const { eventId, sectionId } = req.params;
-  const { section_name, price, capacity } = req.body;
+  const { section_name, price, capacity } = req.body ?? {};
 
   try {
     const existingResult = await pool.query(
@@ -358,21 +464,12 @@ app.put("/events/:eventId/sections/:sectionId", async (req, res) => {
       SET
         section_name = $1,
         price = $2,
-        capacity = $3,
-      WHERE id = $5 AND event_id = $6
+        capacity = $3
+      WHERE id = $4 AND event_id = $5
       RETURNING *
       `,
-      [
-        updatedSectionName,
-        updatedPrice,
-        updatedCapacity,
-        sectionId,
-        eventId
-      ]
+      [updatedSectionName, updatedPrice, updatedCapacity, sectionId, eventId]
     );
-
-    await redis.del(`events:${eventId}`);
-    await redis.del(EVENTS_LIST_KEY);
 
     return res.status(200).json(result.rows[0]);
   } catch (err) {
@@ -398,9 +495,6 @@ app.delete("/events/:eventId/sections/:sectionId", async (req, res) => {
       return res.status(404).json({ error: "Section not found for this event" });
     }
 
-    await redis.del(`events:${eventId}`);
-    await redis.del(EVENTS_LIST_KEY);
-
     return res.status(200).json({
       message: "Section deleted successfully",
       deletedSection: result.rows[0]
@@ -411,63 +505,73 @@ app.delete("/events/:eventId/sections/:sectionId", async (req, res) => {
   }
 });
 
-//events
+// events
 app.get("/events/:eventId", async (req, res) => {
-    const { eventId } = req.params;
-    const EVENT_KEY = `events:${eventId}`
-    try{
-        const cached = await redis.get(EVENT_KEY);
-        if (cached) {
-            return res.status(200).json(JSON.parse(cached));
-        }
-        const result = await pool.query(`
-            SELECT *
-            FROM events
-            WHERE id = $1
-        `, [eventId]);
+  const { eventId } = req.params;
+  const EVENT_KEY = `events:${eventId}`;
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: "Event not found" });
-        }
-        
-        const event = result.rows[0];
-
-        await redis.set(EVENT_KEY, JSON.stringify(event), {
-            EX: EVENT_TTL
-        });
-
-        return res.status(200).json(event);
-    }catch(err){
-        return res.status(500).json({ error: "Internal server error" });
+  try {
+    const cached = await redis.get(EVENT_KEY);
+    if (cached) {
+      return res.status(200).json(JSON.parse(cached));
     }
+
+    const result = await pool.query(
+      `
+      SELECT *
+      FROM events
+      WHERE id = $1
+      `,
+      [eventId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const event = result.rows[0];
+
+    await redis.set(EVENT_KEY, JSON.stringify(event), {
+      EX: EVENT_TTL
+    });
+
+    return res.status(200).json(event);
+  } catch (err) {
+    console.error("Failed to fetch event:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 app.get("/events", async (req, res) => {
-    try{
-        const cached = await redis.get(EVENTS_LIST_KEY);
-        if (cached) {
-            return res.status(200).json(JSON.parse(cached));
-        }
-        const result = await pool.query(`
-            SELECT *
-            FROM events
-            ORDER BY date_time ASC
-        `);
-
-        const events = result.rows;
-
-        await redis.set(EVENTS_LIST_KEY, JSON.stringify(events), {
-            EX: EVENTS_LIST_TTL
-        });
-
-        return res.status(200).json(events);
-    }catch(err){
-        return res.status(500).json({ error: "Internal server error" });
+  try {
+    const cached = await redis.get(EVENTS_LIST_KEY);
+    if (cached) {
+      return res.status(200).json(JSON.parse(cached));
     }
+
+    const result = await pool.query(
+      `
+      SELECT *
+      FROM events
+      ORDER BY date_time ASC
+      `
+    );
+
+    const events = result.rows;
+
+    await redis.set(EVENTS_LIST_KEY, JSON.stringify(events), {
+      EX: EVENTS_LIST_TTL
+    });
+
+    return res.status(200).json(events);
+  } catch (err) {
+    console.error("Failed to fetch events:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 app.post("/events", async (req, res) => {
-  const { name, venue, base_price, date_time, description, category } = req.body;
+  const { name, venue, base_price, date_time, description, category } = req.body ?? {};
 
   try {
     if (!name || !venue || base_price == null || !date_time) {
@@ -493,7 +597,6 @@ app.post("/events", async (req, res) => {
     );
 
     const newEvent = result.rows[0];
-
     const EVENT_KEY = `events:${newEvent.id}`;
 
     await redis.set(EVENT_KEY, JSON.stringify(newEvent), {
@@ -504,6 +607,7 @@ app.post("/events", async (req, res) => {
 
     return res.status(201).json(newEvent);
   } catch (err) {
+    console.error("Failed to create event:", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -539,7 +643,7 @@ app.delete("/events/:eventId", async (req, res) => {
   }
 });
 
-//health check
+// health check
 app.get("/health", async (req, res) => {
   const checks = {};
   let healthy = true;
@@ -575,7 +679,7 @@ app.get("/health", async (req, res) => {
     checks
   };
 
-    res.status(healthy ? 200 : 503).json(body)
+  return res.status(healthy ? 200 : 503).json(body);
 });
 
 app.listen(PORT, () => {

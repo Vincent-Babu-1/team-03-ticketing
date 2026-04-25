@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS event_sections (
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   section_name TEXT NOT NULL,
   price NUMERIC(10,2) NOT NULL,
-  capacity INT,
+  capacity INT
 );
 
 CREATE TABLE IF NOT EXISTS seats (
@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS seats (
   section_id UUID NOT NULL REFERENCES event_sections(id) ON DELETE CASCADE,
   row TEXT NOT NULL,
   seat_number INT NOT NULL,
-  status TEXT NOT NULL,
-  CONSTRAINT unique_seat_in_section UNIQUE (section_id, row, seat_number)
-)
+  status TEXT NOT NULL DEFAULT 'available' 
+    CHECK(status IN ('available', 'reserved', 'sold')),
+  CONSTRAINT unique_seat_in_section 
+    UNIQUE (section_id, row, seat_number)
+);
