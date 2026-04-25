@@ -43,7 +43,7 @@ Creates a new event.
 #### Example
 
 ```bash id="f0z58m"
-curl -X POST http://localhost:3000/events \
+curl -X POST http://event-cat-service:3001/events \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Drake Concert",

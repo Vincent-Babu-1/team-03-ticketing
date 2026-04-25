@@ -21,7 +21,7 @@ const errorRate = new Rate("errors");
 // Update this URL to point to your main read endpoint.
 // From inside the holmes container, use the service name (not localhost).
 const POST_URL = "http://purchase-service:3001/purchases"; 
-const HEALTH_URL = "http://analytics-worker:3001/health"; 
+const HEALTH_URL = "http://analytics-worker:3007/health"; 
 
 function newUUID(){ 
   //return crypto.randomUUID(); 
@@ -51,15 +51,31 @@ export default function () {
     quantity: 2,
     cardToken: "test-card-1"
   }
+  
 
+  const data2 = {
+    userId: newUUID(),
+    eventId: newUUID(),
+    quantity: 2,
+    cardToken: "test-card-1"
+  }
+  let res2 = http.post(POST_URL, JSON.stringify(data), {
+    headers: { 
+      'Content-Type': 'application/json',
+      'Idempotency-Key': newUUID()
+    },
+  });
   let res = http.post(POST_URL, JSON.stringify(data), {
     headers: { 
       'Content-Type': 'application/json',
       'Idempotency-Key': newUUID()
     },
   });
-
   const ok = check(res, {
+    "status is 200": (r) => r.status === 200,
+    "response time < 500ms": (r) => r.timings.duration < 500,
+  });
+  const ok2 = check(res2, {
     "status is 200": (r) => r.status === 200,
     "response time < 500ms": (r) => r.timings.duration < 500,
   });
@@ -70,17 +86,19 @@ export default function () {
     "status is 200": (r) => r.status === 200,
     "response time < 500ms": (r) => r.timings.duration < 500,
   });
+  
 
-  if (!res1.json().queueDepth){
+  if (!Number.isInteger(res1.json().queueDepth)){
     console.log("WARNING: analytics worker /health not implemented, or missing return value `queueDepth`")
+    console.log(JSON.stringify(res1.json()))
     errorRate.add(!ok1);
     sleep(0.5);
     return;
   }
   
-  console.log("analytics queue depth: " + res1.json().queueDepth);
+  //console.log("analytics queue depth: " + res1.json().queueDepth);
 
-  errorRate.add((!ok) || (!ok1));
+  errorRate.add((!ok) || (!ok1) || (!ok2));
   sleep(0.5);
 
 }

@@ -50,7 +50,7 @@ docker compose exec holmes bash
 ### Base URLs (development)
 
 ```
-[your-service-name]    http://localhost:[port]
+refund-service         http://refund-service:3001
 [your-service-name]    http://localhost:[port]
 [worker-name]          http://localhost:[port]   (health endpoint only)
 holmes                 (no port — access via exec)
@@ -68,6 +68,11 @@ holmes                 (no port — access via exec)
 [One paragraph describing what your system does and how the services interact.
 Include which service calls which, what queues exist, and how data flows.]
 
+[Each of us can add to this paragraph with our section of the system.]
+
+Refund requests are sent to the Refund service, which checks the Refund database and synchronously calls the Purchase service to determine whether the request is valid. If the request is valid, then the request is noted in the Refund database as successful and the Payment service is contacted to reverse the charge.
+
+
 ---
 
 ## API Reference
@@ -81,13 +86,15 @@ Include which service calls which, what queues exist, and how data flows.]
 
 ### Event Ticketing Platform
 
+---
+
+## Refund Service
+
 ### GET /health
 
 ```
 GET /health
-
   Returns the health status of this service and its dependencies.
-
   Responses:
     200  Service and all dependencies healthy
     503  One or more dependencies unreachable
@@ -96,7 +103,7 @@ GET /health
 **Example request:**
 
 ```bash
-curl http://localhost:[port]/health
+curl http://refund-service:3001/health | jq .
 ```
 
 **Example response (200):**
@@ -119,9 +126,66 @@ curl http://localhost:[port]/health
 }
 ```
 
----
+### POST /refund-request
 
-<!-- Add the rest of your endpoints below. One ### section per endpoint. -->
+```
+POST /refund-request
+  Attempts to refund the given purchase.
+  Parameters:
+    refundRequestId [UUID]: used to check idempotency for refund requests.
+    purchaseId [UUID]: the id of the purchase asking to be refunded.
+  Responses:
+    200  Refund successful, payment reversal request sent
+    202  This purchase already refunded; no action taken
+    400  Purchase does not exist, refund marked as failed in database
+    404  Duplicate refund request, ignored
+```
+
+**Example request:**
+
+```bash
+curl -s -X POST http://refund-service:3001/refund-request \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: a0eebc99--4ef8-bb6d-6bb9bd387776" \
+  -d '{"refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776", "purchaseId": "df33337e-9fac-4854-9ad8-3af18d822cfc"}' | jq .
+```
+**Example response (200):**
+```json
+{
+  "refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776",
+  "purchaseId": "df33337e-9fac-4854-9ad8-3af18d822cfc",
+  "success": true
+}
+```
+**Example response (202):**
+```json
+{
+  "refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776",
+  "purchaseId": "df33337e-9fac-4854-9ad8-3af18d822cfc",
+  "success": false,
+  "failureReason": "already_refunded"
+}
+```
+
+**Example response (400):**
+```json
+{
+  "refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776",
+  "purchaseId": "df33337e-9fac-4854-9ad8-3af18d822cfc",
+  "success": false,
+  "failureReason": "purchase_missing"
+}
+```
+**Example response (404):**
+```json
+{
+  "refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776",
+  "purchaseId": "df33337e-9fac-4854-9ad8-3af18d822cfc",
+  "success": false,
+  "failureReason": "idempotency_skip"
+}
+```
+
 
 ---
 

@@ -48,7 +48,7 @@ services:
       - team-net
     environment:
       - TERM=xterm-256color
-    # Holmes has no ports — access it via: docker compose exec holmes bash
+    # Holmes has no port`s — access it via: docker compose exec holmes bash
 
   # ── Add your services here ─────────────────────────────────────────────────
   #
@@ -117,6 +117,7 @@ services:
     environment:
       - DATABASE_URL=postgres://user:pass@purchase-db:5432/purchasedb
       - REDIS_URL=redis://redis:6379
+      - PAYMENT_SERVICE_URL=http://payment-service:3001
     depends_on:
       purchase-db:
         condition: service_healthy
@@ -190,8 +191,16 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379
     depends_on:
+      notification-service:
+        condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://notification-worker:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   # REFUND SERVICE:
   refund-service:
@@ -210,13 +219,15 @@ services:
       - REDIS_URL=redis://redis:6379
       - PIPELINE=team-03
       - QUEUE_NAME=refundRequests
+      - CHECK_PURCHASE_URL=http://purchase-service:3001/purchases/
+      - REVERSE_PAYMENT_URL=http://payment-service:3001/reverse
     depends_on:
       refund-db:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://refund-service:3005/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://refund-service:3001/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -235,12 +246,13 @@ services:
     networks:
       - team-net
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://waitlist-worker:3000/health"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 15s
 
+  # FRAUD WORKER
   fraud-worker:
     build: ./C-fraud
     container_name: fraud-worker
@@ -253,13 +265,37 @@ services:
       - QUEUE_NAME=purchase-events
       - DLQ_NAME=fraud-dlq
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://fraud-worker:3008/health"]
     depends_on:
       fraud-db:
         condition: service_healthy
       redis:
         condition: service_healthy
     command: node worker.js
+
+  # ANALYTICS WORKER:
+  analytics-worker:
+    build:
+      context: .
+      dockerfile: ./C-analytics/Dockerfile
+    container_name: analytics-worker
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgres://user:pass@analytics-db:5432/analyticsdb
+    depends_on:
+      redis:
+        condition: service_healthy
+      analytics-db:
+        condition: service_healthy
+    networks:
+      - team-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://analytics-worker:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     
   # ── Postgres template ──────────────────────────────────────────────────────
   #
@@ -295,6 +331,7 @@ services:
         - "5436:5432"
      volumes:
        - analytics-db-data:/var/lib/postgresql/data
+       - ./DB-folder/DB-analytics.sql:/docker-entrypoint-initdb.d/init.sql:ro
      networks:
        - team-net
      healthcheck:

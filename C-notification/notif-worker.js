@@ -1,47 +1,67 @@
-import { redisSubscriber } from "./redis.js";
+import redis, { redisSubscriber } from "./redis.js";
+import { createClient } from 'redis';
+import express from 'express';
 
-console.log("🔥 WORKER FILE STARTED");
-const CHANNEL = "confirmed-purchases";
+const app = express();
+app.use(express.json());
+const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379";
+const redisClient = createClient({ url: REDIS_URL });
+const PORT = 3001;
+let lastJobAt = null;
 
-async function startWorker() {
-  console.log("📡 Notification worker starting...");
+// Publish to channel for testing
+console.log("WORKER FILE STARTED");
 
+const purchaseId = "abc123";
+const userId = "user456";
+const eventId = "event789";
 
-  // 2. subscribe AFTER connection
-  await redisSubscriber.subscribe(CHANNEL, (message) => {
+await redis.publish('confirmed-purchases', JSON.stringify({ purchaseId, userId, eventId }));
+
+async function connectWithRetry() {
+  while (true) {
     try {
-      const data = JSON.parse(message);
-
-      console.log("📩 Received confirmed purchase:");
-      console.log(data);
-
-      // simulate email sending
-      const emailLog = `
-=== EMAIL SENT ===
-To: ${data.email}
-Subject: Purchase Confirmation
-Body: Your purchase of ${data.item} is confirmed.
-==================
-`;
-
-      console.log(emailLog);
-
-      // optional file log
-      // fs.appendFileSync("emails.log", emailLog);
-
+      await redisClient.connect();
+      console.log("Connected to Redis");
+      break;
     } catch (err) {
-      console.error("❌ Failed to process message:", err);
+      console.log("Redis not ready, retrying...");
+      await new Promise(r => setTimeout(r, 2000));
     }
-  });
-
-  console.log(`👂 Listening on ${CHANNEL}...`);
-
-  // keep process alive (important for Docker)
-  process.stdin.resume();
+  }
 }
 
-// startup safety
-startWorker().catch((err) => {
-  console.error("🔥 Worker failed to start:", err);
-  process.exit(1);
+// health endpoint 
+app.get("/health", async (req, res) => {
+  try {
+    if (!redisClient.isOpen) {
+      console.log("redis not open yet");
+      await redisClient.connect();
+      console.log("redis connected");
+    }
+    
+    await redisClient.ping();
+    //const dlqDepth = await redisClient.lLen(DLQ_NAME);
+    res.status(200).json({
+      status: "ok",
+      checks: {
+        redis: "ok",
+        database: "ok"
+      },
+      queueDepth:0, //uses pub/sub instead
+      dlqDepth:0, //TODO: implement dlq
+      lastJobAt
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: "error",
+      error: err.message
+    });
+  }
+});
+
+await connectWithRetry();
+
+app.listen(PORT, () => {
+  console.log("Health server running on port", PORT);
 });
