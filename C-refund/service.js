@@ -12,7 +12,7 @@ app.use(express.json());
 const CHANNEL = "seat-released";
 const queueName = process.env.QUEUE_NAME || 'refundRequests'
 const CHECK_PURCHASE_URL = process.env.CHECK_PURCHASE_URL || 'http://purchase-service:3001/purchases/'
-const REVERSE_PAYMENT_URL = process.env.REVERSE_PAYMENT_URL || 'http://payment-service:3001/reverse'
+const REVERSE_PAYMENT_URL = process.env.REVERSE_PAYMENT_URL || 'http://payment-service:3001/payments/reverse'
 const pipeline = process.env.PIPELINE || 'team-03'
 const ttlSec = Number(process.env.IDEM_TTL_SEC || '86400')
 
@@ -45,13 +45,16 @@ async function applySideEffect(refundRequestId, purchaseId) {
   );
   const post = result.rows[0];
 
-  //TODO: contact POST http://payment-service:3001/reverse with purchaseId
-
+  // contact POST http://payment-service:3001/payments/reverse with purchaseId
   await axios.post(REVERSE_PAYMENT_URL, {
-    purchaseId:purchaseId,
-    refundRequestId:refundRequestId //in case you need it
+    purchase_id:purchaseId,
+    refund_id:refundRequestId //in case you need it
   }).then(response => {
-    console.log("purchase",purchaseId, "payment reversed!");
+    if (response.status === 404) {
+      console.error(`Purchase ${purchaseId} not found in payment service`)
+      return;
+    }
+    console.log("purchase ", purchaseId, " payment reversed!");
   }).catch(error => {
     console.error('Error in refunds: error signalling for payment reversal', error);
   });

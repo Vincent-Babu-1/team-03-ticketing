@@ -60,8 +60,8 @@ app.post('/purchases', async (req, res) => {
   }
 
   // Gets the fields from the request body & checks if anything missing
-  const { userId, eventId, quantity, cardToken } = req.body;
-  if (!userId || !eventId || !quantity || !cardToken) {
+  const { userId, eventId, quantity, cardToken, seatId } = req.body;
+  if (!seatId || !userId || !eventId || !quantity || !cardToken) {
     console.log(`purchase ${idempotencyKey} is not valid (missing fields)`);
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -129,6 +129,7 @@ app.post('/purchases', async (req, res) => {
       purchaseId,
       userId,
       eventId,
+      seatId,
       quantity,
       totalUsd: parseFloat(totalUsd),
       status,
@@ -140,6 +141,7 @@ app.post('/purchases', async (req, res) => {
       purchaseId,
       userId,
       eventId,
+      seatId,
       quantity,
       totalUsd: parseFloat(totalUsd),
       status,
@@ -171,21 +173,22 @@ app.listen(PORT, async () => {
 // Create the purchases table if it doesn't exist
 await pool.query(`
   CREATE TABLE IF NOT EXISTS purchases (
-    id              UUID PRIMARY KEY,
-    idempotency_key UUID UNIQUE NOT NULL,
-    user_id         UUID NOT NULL,
-    event_id        UUID NOT NULL,
-    quantity        INTEGER NOT NULL,
-    total_usd       NUMERIC(10,2) NOT NULL,
-    card_token      TEXT NOT NULL,
-    status          TEXT NOT NULL DEFAULT 'pending',
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  )
+  id UUID PRIMARY KEY,
+  idempotency_key UUID UNIQUE NOT NULL,
+  user_id UUID NOT NULL,
+  event_id UUID NOT NULL,
+  seat TEXT NOT NULL,
+  quantity INTEGER NOT NULL,
+  total_usd NUMERIC(10,2) NOT NULL,
+  card_token TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'failed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 `);
 
 await pool.query(`
   CREATE TABLE IF NOT EXISTS reservations (
-    id UUID PRIMARY KEY, -- maybe serial?
+    id UUID PRIMARY KEY,
     purchase_id UUID NOT NULL,
     event_id UUID NOT NULL,
     seat_id UUID NOT NULL,

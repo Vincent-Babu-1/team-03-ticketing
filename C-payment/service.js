@@ -1,6 +1,6 @@
 import express from 'express'
 import crypto from 'crypto'
-import { pool, checkDb, checkRedis } from './wait.js'
+import { pool, checkDb, checkRedis, redis } from './wait.js'
 
 const SIMULATED_SUCCESS_RATE = parseFloat(process.env.SIM_SUCCESS_RATE || '1.0');
 const PORT = 3001;
@@ -9,7 +9,6 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const app = express();
 app.use(express.json());
 console.log('payment-service: server initiated.')
-
 
 // http://localhost:3003/
 app.get("/", (req, res) => {
@@ -20,7 +19,6 @@ app.get("/", (req, res) => {
 app.get('/health', async (req, res) => {
     const health = {db: 'ok', redis: 'ok'};
     let allGood = true;
-
     try {
         await checkDb();
     } catch {
@@ -33,7 +31,6 @@ app.get('/health', async (req, res) => {
         health.redis = 'unavailable';
         allGood = false;
     }
-
     res.status(allGood ? 200: 503).json({service: "payment-service", status: allGood ? 'ok' : 'degraded', ...health});
 });
 
@@ -44,10 +41,10 @@ app.post("/payments", async(req, res) => {
         return res.status(400).json({error: 'Missing required fields: purchase_id, amount, cardToken'});
     }
 
-    // check if paid already (if purchase_id already is linked to a payment, return original payment)
+    // if purchase already exists, return it. idempotency check
     const existing = await pool.query(
-        'SELECT * FROM payments WHERE purchase_id = $1 AND status = $2',
-        [purchase_id, 'succeeded']
+        'SELECT * FROM payments WHERE purchase_id = $1',
+        [purchase_id]
     );
     if (existing.rows.length > 0) {
         console.log(`payment-service: duplicate charge attempted for purchase: ${purchase_id}`)
@@ -55,7 +52,7 @@ app.post("/payments", async(req, res) => {
         return res.status(200).json({
             payment_id: existingPayment.id,
             purchase_id: existingPayment.purchase_id,
-            status: existingPayment.status === "succeeded" ? "success" : "failed",
+            status: existingPayment.status === "succeeded" ? "success" : existingPayment.status,
             amount: (existingPayment.status === "succeeded" ? existingPayment.total_usd : 0)
         });
     }
@@ -81,8 +78,18 @@ app.post("/payments", async(req, res) => {
     });
 });
 
+// Lookup a payment by purchase_id
+// Could be useful
 app.get('/payments/:purchase_id', async(req,res) => {
-    console.log("To Be Implemented, not done in Sprint 1");
+    const id = req.params.purchase_id;
+    const payment = await pool.query(
+        ' SELECT * FROM payments WHERE purchase_id = $1',
+        [id]
+    );
+    if (payment.rows.length === 0) {
+        return res.status(404).json({error: `Payment with purchase_id ${id} not found.`})
+    }
+    return res.status(200).json(payment.rows[0]);
 });
 
 // refunding:
@@ -90,7 +97,53 @@ app.get('/payments/:purchase_id', async(req,res) => {
 // and publishes a "seat released" event on Redis pub/sub so the Wait list 
 // Worker can promote the next user.'
 app.post("/payments/reverse", async(req, res) => {
-    console.log("To Be Implemented, not done in Sprint 1");
+    const { purchase_id, refund_id } = req.body;
+    if (!purchase_id || !refund_id) {
+        return res.status(400).json({error: "Missing purchase_id to refund."})
+    }
+    const payment = await pool.query(
+        'SELECT * FROM payments WHERE purchase_id = $1', [purchase_id]
+    );
+    if (payment.rows.length === 0) {
+        return res.status(404).json({error: `No payment found of purchase id: ${purchase_id}`})
+    }
+    const paymentData = payment.rows[0];
+    // Safety check 
+    if (paymentData.status === 'refunded') {
+        console.log(`Already refunded purchase: ${purchase_id}`);
+        return res.status(202).json({
+            payment_id: paymentData.id,
+            refund_id: paymentData.refund_id,
+            purchase_id: paymentData.purchase_id,
+            status: paymentData.status,
+            total_usd: paymentData.total_usd
+        });
+    }
+    if (paymentData.status === 'failed') {
+        return res.status(400).json({error: `Payment failed, nothing to refund for purchase: ${purchase_id}`})
+    }
+
+    const updated = await pool.query(
+        `UPDATE payments SET status = 'refunded', updated_at = NOW(), refund_id = $1
+        WHERE purchase_id = $2 RETURNING *`, [refund_id, purchase_id]
+    );
+    const reservation = await pool.query(
+        `UPDATE reservations SET status = 'released', updated_at = NOW() 
+        WHERE purchase_id = $1
+        RETURNING *
+        `, [purchase_id]
+    ); // we release the seat(s) for the purchase as well, as refunded.
+    await redis.publish('seat-released', JSON.stringify({ purchaseId: purchase_id, eventId: reservation.rows[0].event_id }))
+    console.log("Published to seat-released pubsub that seat(s) have been released.")
+    const refunded = updated.rows[0];
+    console.log(`refunded purchase ${purchase_id} and released all associated seats.`)
+    return res.status(200).json({
+        payment_id: refunded.id,
+        purchase_id: refunded.purchase_id,
+        refund_id: refunded.refund_id,
+        status: refunded.status,
+        total_usd: refunded.total_usd
+    })
 });
 
 app.listen(PORT, async () => {
