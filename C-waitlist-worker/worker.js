@@ -5,19 +5,38 @@ const QUEUE = 'waitlist-queue';
 const DLQ = 'waitlist-queue:dlq';
 const PORT = 3000;
 
+// The pub/sub channel the Refund Service publishes to when a seat is released
+const SEAT_RELEASED_CHANNEL = 'seat-released';
+
 // Connect to Redis
 const redis = createClient({
   url: process.env.REDIS_URL || 'redis://redis:6379'
 });
 
+//Connect to subscriber
+const subscriber = createClient({
+  url: process.env.REDIS_URL || 'redis://redis:6379'
+});
+
 redis.on('error', (err) => console.error('[redis] error:', err.message));
+subscriber.on('error', (err) => console.error('Subscriber error:', err.message));
 
 
 await redis.connect();
+await subscriber.connect();
 console.log('waitlist-worker connected to Redis');
-console.log('waitlist-worker listening on waitlist-queue...');
 
-// Track some stats for the health endpoint
+// Refund Service publishes to seat-released, then push to waitlist-queue
+await subscriber.subscribe(SEAT_RELEASED_CHANNEL, (message) => {
+  console.log('Seat released event received - pushing to waitlist-queue:', message);
+  redis.rPush(QUEUE, message).catch((err) => {
+    console.error('Failed to push seat-released message to waitlist-queue:', err.message);
+  });
+});
+console.log('Subscribed to', SEAT_RELEASED_CHANNEL);
+console.log('Listening for messages on', QUEUE);
+
+// Track stats for the health endpoint
 let lastJobAt = null;
 let jobsProcessed = 0;
 
