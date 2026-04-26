@@ -10,12 +10,10 @@ const redis = createClient({
   url: process.env.REDIS_URL || 'redis://redis:6379'
 });
 
-const subscriber = createClient({
-  url: process.env.REDIS_URL || 'redis://redis:6379'
-});
+redis.on('error', (err) => console.error('[redis] error:', err.message));
+
 
 await redis.connect();
-await subscriber.connect();
 console.log('waitlist-worker connected to Redis');
 console.log('waitlist-worker listening on waitlist-queue...');
 
@@ -45,19 +43,28 @@ async function processEntry(raw) {
 
   // Valid entry — promote the user by publishing to confirmed-purchases
   // The Notification Service is subscribed to this channel
-  const message = JSON.stringify({
-    type: 'waitlist-promotion',
-    userId: entry.userId,
-    eventId: entry.eventId,
-    promotedAt: new Date().toISOString(),
-  });
-  await redis.publish('confirmed-purchases', message);
+  try{
+    const message = JSON.stringify({
+      type: 'waitlist-promotion',
+      userId: entry.userId,
+      eventId: entry.eventId,
+      promotedAt: new Date().toISOString(),
+    });
+    
+    await redis.publish('confirmed-purchases', message);
 
-  // Update stats
-  jobsProcessed = jobsProcessed + 1;
-  lastJobAt = new Date().toISOString();
+    // Update stats
+    jobsProcessed = jobsProcessed + 1;
+    lastJobAt = new Date().toISOString();
 
-  console.log('Promoted waitlisted user:', { userId: entry.userId, eventId: entry.eventId });
+    console.log('Promoted waitlisted user:', { userId: entry.userId, eventId: entry.eventId });
+
+  } catch (err) {
+    // Something unexpected went wrong (like Redis being temporarily down).
+    // Send to DLQ instead of retrying forever.
+    console.error('Unexpected error, moving message to DLQ:', err.message);
+    await redis.rPush(DLQ, raw);
+  }
 }
 
 // Health endpoint so docker compose ps shows (healthy)
@@ -95,7 +102,7 @@ app.listen(PORT, () => {
 async function startWorker() {
   while (true) {
     try {
-      const result = await subscriber.blPop(QUEUE, 5);
+      const result = await redis.blPop(QUEUE, 5);
       if (result) {
         await processEntry(result.element);
       }

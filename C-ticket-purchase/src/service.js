@@ -98,21 +98,25 @@ app.post('/purchases', async (req, res) => {
   console.log(`purchase ${idempotencyKey} received payment message: ${status}`);
   const totalUsd = (quantity * 102).toFixed(2);
 
-  await pool.query(
-    `INSERT INTO purchases (id, idempotency_key, user_id, event_id, quantity, total_usd, card_token, status)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-    [purchaseId, idempotencyKey, userId, eventId, quantity, totalUsd, cardToken, status]
-  );
-
-  // If payment succeeded, notify other services via Redis
+  // If payment succeeded, notify other services via Redis and create seat reservation
   if (status === 'confirmed') {
+    const reservationId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO seat_reservations (id, event_id, user_id, quantity, status, idempotency_key)
+       VALUES ($1, $2, $3, $4, 'confirmed', $5)`,
+      [reservationId, eventId, userId, quantity, idempotencyKey]
+    );
+    console.log(`Seats confirmed - reservation id: ${reservationId}`);
+    // Save the confirmed purchase to the database
+    await pool.query(
+      `INSERT INTO purchases
+         (id, idempotency_key, user_id, event_id, quantity, total_usd, card_token, status, reservation_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [purchaseId, idempotencyKey, userId, eventId, quantity, totalUsd, cardToken, status, reservationId]
+    );
     await redis.publish('confirmed-purchases', JSON.stringify({ purchaseId, userId, eventId }));
     await redis.rPush('analytics-queue', JSON.stringify({ event: 'ticket_purchased', purchaseId }));
-  }
 
-  // Julia: changed status from 201 to 200 to pass k1 test. We should discuss this during class so
-  // we can have consistent agreements on expected returns statuses.
-  if (status === 'confirmed') {
     console.log(`purchase ${idempotencyKey} confirmed!`);
     return res.status(200).json({
       purchaseId,
@@ -121,9 +125,18 @@ app.post('/purchases', async (req, res) => {
       quantity,
       totalUsd: parseFloat(totalUsd),
       status,
+      reservationId,
       createdAt: new Date().toISOString()
     });
-  } else {
+    
+  } else{
+    // Payment failed - saves the failed purchase, no seat reservation needed
+    await pool.query(
+      `INSERT INTO purchases
+         (id, idempotency_key, user_id, event_id, quantity, total_usd, card_token, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [purchaseId, idempotencyKey, userId, eventId, quantity, totalUsd, cardToken, status]
+    );
     console.log(`purchase ${idempotencyKey} failed (due to payment error)!`);
     return res.status(402).json({
       purchaseId,
@@ -132,6 +145,7 @@ app.post('/purchases', async (req, res) => {
       quantity,
       totalUsd: parseFloat(totalUsd),
       status,
+      reservationId,
       createdAt: new Date().toISOString()
     });
   }
@@ -152,10 +166,26 @@ app.get('/purchases/:id', async (req, res) => {
   res.json(rows[0]);
 });
 
+// GET /reservations/:id
+// Look up a seat reservation by its ID
+app.get('/reservations/:id', async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT * FROM seat_reservations WHERE id = $1',
+    [req.params.id]
+  );
+ 
+  if (rows.length === 0) {
+    return res.status(404).json({ error: 'Reservation not found' });
+  }
+ 
+  res.json(rows[0]);
+});
+
 // ── Start the server ─────────────────────────────────────────────────────────
 app.listen(PORT, async () => {
   console.log(`ticket-purchase-service running on port ${PORT}`);
 });
+
 
 // Create the purchases table if it doesn't exist
 await pool.query(`
@@ -168,6 +198,20 @@ await pool.query(`
     total_usd       NUMERIC(10,2) NOT NULL,
     card_token      TEXT NOT NULL,
     status          TEXT NOT NULL DEFAULT 'pending',
+    reservation_id  UUID, 
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )
+`);
+
+// Create the seat reservations table if it doesn't exist
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS seat_reservations (
+    id              UUID PRIMARY KEY,
+    event_id        UUID NOT NULL,
+    user_id         UUID NOT NULL,
+    quantity        INTEGER NOT NULL CHECK (quantity > 0),
+    status          TEXT NOT NULL DEFAULT 'confirmed',
+    idempotency_key UUID NOT NULL UNIQUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )
 `);
