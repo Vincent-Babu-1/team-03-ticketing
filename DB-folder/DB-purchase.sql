@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS reservations (
     id UUID PRIMARY KEY,
     purchase_id UUID NOT NULL,
     event_id UUID NOT NULL,
-    seat UUID NOT NULL,
+    seat TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('released', 'pending', 'confirmed')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

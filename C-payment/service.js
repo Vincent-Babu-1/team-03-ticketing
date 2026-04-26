@@ -79,7 +79,6 @@ app.post("/payments", async(req, res) => {
 });
 
 // Lookup a payment by purchase_id
-// Could be useful
 app.get('/payments/:purchase_id', async(req,res) => {
     const id = req.params.purchase_id;
     const payment = await pool.query(
@@ -92,10 +91,8 @@ app.get('/payments/:purchase_id', async(req,res) => {
     return res.status(200).json(payment.rows[0]);
 });
 
-// refunding:
-// Refund Service:  'then calls the Payment Service to reverse the charge 
-// and publishes a "seat released" event on Redis pub/sub so the Wait list 
-// Worker can promote the next user.'
+// refunding: Payment Service reverses charge, publishes a "seat released" event on Redis pub/sub
+// so the Wait list Worker can promote the next user. 
 app.post("/payments/reverse", async(req, res) => {
     const { purchase_id, refund_id } = req.body;
     if (!purchase_id || !refund_id) {
@@ -108,7 +105,7 @@ app.post("/payments/reverse", async(req, res) => {
         return res.status(404).json({error: `No payment found of purchase id: ${purchase_id}`})
     }
     const paymentData = payment.rows[0];
-    // Safety check 
+    // Safety check -- did we already refund?
     if (paymentData.status === 'refunded') {
         console.log(`Already refunded purchase: ${purchase_id}`);
         return res.status(202).json({
@@ -118,11 +115,12 @@ app.post("/payments/reverse", async(req, res) => {
             status: paymentData.status,
             total_usd: paymentData.total_usd
         });
-    }
+    } // also if a payment failed, you should NOT be allowed to refund it.
     if (paymentData.status === 'failed') {
         return res.status(400).json({error: `Payment failed, nothing to refund for purchase: ${purchase_id}`})
     }
-
+    // if there is a payment to refund:
+    await sleep(250); // simulated refund payment work.
     const updated = await pool.query(
         `UPDATE payments SET status = 'refunded', updated_at = NOW(), refund_id = $1
         WHERE purchase_id = $2 RETURNING *`, [refund_id, purchase_id]
@@ -133,7 +131,7 @@ app.post("/payments/reverse", async(req, res) => {
         RETURNING *
         `, [purchase_id]
     ); // we release the seat(s) for the purchase as well, as refunded.
-    await redis.publish('seat-released', JSON.stringify({ purchaseId: purchase_id, eventId: reservation.rows[0].event_id }))
+    await redis.publish('seat-released', JSON.stringify({ purchaseId: purchase_id, eventId: reservation.rows[0].event_id, seat: reservation.seat }))
     console.log("Published to seat-released pubsub that seat(s) have been released.")
     const refunded = updated.rows[0];
     console.log(`refunded purchase ${purchase_id} and released all associated seats.`)
