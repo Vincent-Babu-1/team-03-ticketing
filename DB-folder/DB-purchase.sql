@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS purchases (
     card_token      TEXT NOT NULL,
     status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'failed')),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  )
+  );
 
 CREATE TABLE IF NOT EXISTS reservations (
     id          UUID PRIMARY KEY,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS reservations (
     status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'released')),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  )
+  );
 
 CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY, 

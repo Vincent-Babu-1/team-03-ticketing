@@ -80,10 +80,12 @@ app.post('/purchases', async (req, res) => {
   console.log(`purchase ${idempotencyKey} is valid and unique`);
 
   // Check that nobody has tried to take this seat already
+  // if even one wanted seat is taken, reject it.
   const takenSeatsCheck = await pool.query(
-    `SELECT seat FROM reservations WHERE event_id = $1 AND seat = ANY($2) 
-    AND STATUS IN ('pending', 'confirmed')`, [eventId, seats]
-  );
+  `SELECT seats FROM reservations WHERE event_id = $1 AND seats && $2::TEXT[] 
+   AND status IN ('pending', 'confirmed')`,
+  [eventId, seats]
+);
   if (takenSeatsCheck.rows.length > 0) {
     console.log(`purchase ${idempotencyKey}: seat(s) already taken.`);
     return res.status(400).json({error: `purchase ${idempotencyKey}: seat(s) already taken.`})
