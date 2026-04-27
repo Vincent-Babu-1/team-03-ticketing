@@ -1,8 +1,8 @@
-# Sprint 3 Report — [Team Name]
+# Sprint 3 Report — Team 3
 
 **Sprint:** 3 — Reliability and Poison Pills  
 **Tag:** `sprint-3`  
-**Submitted:** [date, before 04.28 class]
+**Submitted:** 04.27
 
 ---
 
@@ -16,18 +16,26 @@
 
 | Team Member | What They Delivered | Key Commits |
 | ----------- | ------------------- | ----------- |
-| [Name]      | | |
-| [Name]      | | |
-| [Name]      | | |
+| Vincent Babu | k6 poison test, Sprint 3 Report, refund service |  |
+| Tien Nguyen  |  |  |
+| Benson Zheng |          |  |
+| Helektra Katsoulakis  |    | |
+| Julia Farber          |        |  |
+|                       |                                                    |  |
+| Katelyn Leung         |   |   |
+| Maria Mechery         |         |  |
+|                       |                                     |  |
+| Franco Htet           |   |  |
+| Rihui Lu           |   |  |
 
 ---
 
 ## What Is Working
 
-- [ ] Poison pill handling: malformed messages go to DLQ, worker keeps running
-- [ ] Worker `GET /health` shows non-zero `dlq_depth` after poison pills are injected
-- [ ] Worker status remains `healthy` while DLQ fills
-- [ ] System handles failure scenarios gracefully (no dangling state, no crash loops)
+- [X] Poison pill handling: malformed messages go to DLQ, worker keeps running
+- [X] Worker `GET /health` shows non-zero `dlq_depth` after poison pills are injected
+- [X] Worker status remains `healthy` while DLQ fills
+- [X] System handles failure scenarios gracefully (no dangling state, no crash loops)
 - [ ] All services/workers required for team size are implemented
 
 ---
@@ -80,11 +88,11 @@ Worker health after injection:
 
 | Metric | Normal-only run | Mixed with poison pills | Change |
 | ------ | --------------- | ----------------------- | ------ |
-| p95    | | | |
-| RPS    | | | |
-| Error rate | | | |
+| p95    | 315.46ms        | 280.26ms                | -35.20ms    |
+| RPS    | 11.208466/s     | 12.589035/s             | +1.380569/s |
+| Error rate | 0.00%       | 12.31%                  | +12.31%     |
 
-[Explain: did throughput hold? Did the worker stay healthy throughout?]
+Throughput remained relatively stable throughout the poison pill test. While the requests per second suffered slightly, the 95th percentile statistic improved slightly. This suggests that the performance is about the same when running the test with only normal requests and when running with poison pills. When running the command `curl http://purchase-service:3001/health | jq .`, the purchase service stayed healthy throughout the test.
 
 ---
 

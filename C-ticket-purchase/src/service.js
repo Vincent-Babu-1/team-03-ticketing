@@ -9,6 +9,10 @@ app.use(express.json());
 const PORT = 3001;
 const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3001';
 
+const isValidUUID = (id) => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 // http://localhost:3002/ -- Checking that its up on port 3002.
 app.get("/", (req, res) => {
   res.send("Hello World FROM purchase-service");
@@ -58,6 +62,9 @@ app.post('/purchases', async (req, res) => {
   const idempotencyKey = req.headers['idempotency-key'];
   if (!idempotencyKey) {
     return res.status(400).json({ error: 'Idempotency-Key header is required' });
+  }
+  if (!isValidUUID(idempotencyKey)){
+    return res.status(400).json({ error: 'Idempotency-Key header is wrong format (expected UUID)' });
   }
 
   // Gets the fields from the request body & checks if anything missing
