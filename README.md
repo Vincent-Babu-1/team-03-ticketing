@@ -47,6 +47,17 @@ docker compose logs -f
 docker compose exec holmes bash
 ```
 
+### Frontend URLs
+
+```text
+Customer demo UI        http://localhost
+Developer dashboard     http://localhost/dev/
+```
+
+The customer-facing UI lives in `ui/user/`.
+The developer dashboard lives in `ui/dev/`.
+Both are served through Caddy on port 80.
+
 ### Base URLs (development)
 
 ```
@@ -75,6 +86,18 @@ Include which service calls which, what queues exist, and how data flows.]
 Purchases are sent to purchase-request which then reserves a seat, then calls payment service to process payment, and then will confirm the purchase if successful. If the purchase fails, the seat is released back and notifies the waitlist worker. Upon success, the notification system is notified, analytics is notified, fraud is notified so it can gather data to notice patterns. Payment service is called by purchase service. Payment service is also called by refund service to refund a purchase, which validates if it exists and if it is refundable, and updates the seat reservation database and calls waitlist worker that there is avaliable seating, so the waitlist worker can allow waitlisted to make purchases on now availiable tickets.
 
 Refund requests are sent to the Refund service, which checks the Refund database and synchronously calls the Purchase service to determine whether the request is valid. If the request is valid, then the request is noted in the Refund database as successful and the Payment service is contacted to reverse the charge.
+
+## Frontend Overview
+
+The repository now includes two static frontend surfaces under `ui/`:
+
+1. `ui/user/`
+The customer-facing ticket purchase demo. It loads events from the event catalog service, lets a user choose a section and quantity, and submits purchases through the purchase service.
+
+2. `ui/dev/`
+The developer dashboard. It provides a lightweight system overview for service and worker health, queue backlog visibility when a service reports it, and a quick visual reference for how the ticketing flow moves through the system.
+
+Caddy serves both frontends. It rewrites `/` to the customer UI and serves the developer dashboard at `/dev/`. It also proxies same-origin health endpoints for the developer dashboard under `/api/system/...`.
 
 
 ---
