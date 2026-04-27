@@ -140,6 +140,16 @@ body {
   border: 1px solid #c8d8f1;
 }
 
+.section-summary {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: #f8f8f8;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .empty-state {
   color: var(--muted);
   background: #f7f7f7;
@@ -167,7 +177,22 @@ body {
   font: inherit;
 }
 
+.purchase-form select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
 .purchase-form input:focus {
+  outline: 2px solid rgba(31, 95, 191, 0.15);
+  border-color: var(--accent);
+}
+
+.purchase-form select:focus {
   outline: 2px solid rgba(31, 95, 191, 0.15);
   border-color: var(--accent);
 }

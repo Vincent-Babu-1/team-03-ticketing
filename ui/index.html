@@ -34,10 +34,19 @@
           Select an event to start your purchase.
         </div>
 
+        <div id="section-summary" class="section-summary hidden"></div>
+
         <form id="purchase-form" class="purchase-form">
           <label>
             Your name
             <input id="user-name" name="userName" type="text" placeholder="Alex Morgan" required>
+          </label>
+
+          <label>
+            Section
+            <select id="section-select" name="sectionId" required disabled>
+              <option value="">Select a section</option>
+            </select>
           </label>
 
           <label>
