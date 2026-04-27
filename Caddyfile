@@ -1,6 +1,5 @@
 :80 {
     root * /srv
-    file_server
 
     handle /api/system/event-catalog/health {
         rewrite * /health
@@ -56,4 +55,11 @@
         uri strip_prefix /api
         reverse_proxy purchase-service:3001
     }
+
+    handle =/ {
+        rewrite * /user/index.html
+        file_server
+    }
+
+    file_server
 }
