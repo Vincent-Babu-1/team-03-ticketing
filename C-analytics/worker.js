@@ -8,13 +8,8 @@ import pg from 'pg';
 const { Pool } = pg;
 
 // Connect to the analytics DB using environment variables
-// set in compose.yml. The defaults match the compose.yml values
 const db = new Pool({
-  host:     process.env.DB_HOST || 'analytics-db',
-  port:     parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'analyticsdb',
-  user:     process.env.DB_USER || 'user',
-  password: process.env.DB_PASSWORD || 'pass',
+  connectionString: process.env.DATABASE_URL || 'postgres://user:pass@analytics-db:5432/analyticsdb',
 });
 
 const QUEUE = 'analytics-queue';
@@ -70,28 +65,17 @@ app.get('/health', async (req, res) => {
 });
  
 // GET /analytics
-// Sprint 2 stub — returns placeholder data.
-// Full implementation (querying event_stats from the DB) is Sprint 3 work.
 app.get('/analytics', async (req, res) => {
-  res.status(200).json({
-    note:   'Analytics stub — full implementation coming in Sprint 3',
-    events: [],
-  });
+  try {
+    const { rows } = await db.query(
+      'SELECT event_id, tickets_sold, browse_count, updated_at FROM event_stats ORDER BY updated_at DESC'
+    );
+    res.status(200).json({ events: rows });
+  } catch (err) {
+    res.status(503).json({ error: 'Database unavailable' });
+  }
 });
- 
-app.listen(PORT, () => {
-  console.log(`[analytics-worker] health server listening on port ${PORT}`);
-});
- 
 
-async function popFixed(queue){
-  const result = await redis.brPop(queue, 1); // 1 = wait forever
-
-  if (!result) return null;
-
-  // node-redis returns: { key, element }
-  return JSON.parse(result.element);
-}
 // ── Consumer loop ─────────────────────────────────────────────────────────────
 async function run() {
   console.log('[analytics-worker] listening on', QUEUE);
@@ -100,7 +84,7 @@ async function run() {
   while (true) {
     try {
       // popFromQueue calls redis BRPOP, which blocks until an event is available
-      const event = await popFixed(QUEUE);
+      const event = await popFromQueue(QUEUE);
 
       
       if (!event) continue;
