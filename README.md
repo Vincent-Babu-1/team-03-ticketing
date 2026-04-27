@@ -271,7 +271,105 @@ curl -s -X POST http://refund-service:3001/refund-request \
   "failureReason": "idempotency_skip"
 }
 ```
+## Notification Service
 
+### GET /health
+```
+GET /health
+  Returns the health status of this service and its dependencies.
+  Responses:
+    200  Service and all dependencies healthy
+    503  One or more dependencies unreachable
+```
+
+**Example request:**
+
+```bash
+curl http://notif-service:3001/health | jq .
+```
+
+**Example response (200):**
+
+```json
+{
+  "ok": true,
+  "status": "ok",
+  "service": "notif-service"
+}
+```
+
+**Example response (503):**
+
+```json
+{
+  "ok": false,
+  "status": "redis-not-ready",
+  "service": "notif-service"
+}
+```
+
+---
+
+### GET /dlq
+
+```
+GET /dlq
+  Returns all messages currently sitting in the dead letter queue.
+  Responses:
+    200  DLQ contents returned (empty array if none)
+```
+
+**Example request:**
+
+```bash
+curl http://notif-service:3001/dlq | jq .
+```
+
+**Example response (200):**
+
+```json
+{
+  "count": 1,
+  "items": [
+    {
+      "data": {
+        "userId": "user-123",
+        "purchaseId": "df33337e-9fac-4854-9ad8-3af18d822cfc",
+        "eventId": "evt-456"
+      },
+      "reason": "Email provider unreachable",
+      "failedAt": "2024-11-01T12:34:56.000Z"
+    }
+  ]
+}
+```
+
+---
+
+### POST /dlq/requeue
+
+```
+POST /dlq/requeue
+  Re-publishes all dead-lettered messages back onto the confirmed-purchases
+  channel, clearing the DLQ. Each message will go through the full retry
+  logic again.
+  Responses:
+    200  All dead letters requeued successfully
+```
+
+**Example request:**
+
+```bash
+curl -s -X POST http://notif-service:3001/dlq/requeue | jq .
+```
+
+**Example response (200):**
+
+```json
+{
+  "requeued": 3
+}
+```
 
 ---
 
