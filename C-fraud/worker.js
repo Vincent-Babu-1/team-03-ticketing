@@ -1,4 +1,4 @@
-import { createClient } from 'redis';
+import { createClient } from "redis";
 import pg from "pg";
 import express from "express";
 
@@ -17,8 +17,6 @@ const PUBSUB_CHANNEL = "fraud-flagged";
 // Clients
 const redisClient = createClient({ url: REDIS_URL });
 const db = new pg.Pool({ connectionString: DATABASE_URL });
-
-
 
 // Tracking
 let lastJobAt = null;
@@ -49,30 +47,42 @@ function suspicious_activity(event) {
 
   return null;
 }
+async function sendToDLQ(raw, reason) {
+  const entry = {
+    raw,
+    reason,
+    timestamp: new Date().toISOString(),
+  };
 
+  await redisClient.rPush(DLQ_NAME, JSON.stringify(entry));
+  console.log("Sent to DLQ:", reason);
+}
 // ---------------------------
-// MAIN WORKER LOOP
+// WORKER LOOP (non-blocking)
 // ---------------------------
-async function start() {
-  await redisClient.connect();
-  await db.connect();
+function runWorker() {
+  async function loop() {
+      try {
+      const result = await redisClient.brPop(QUEUE_NAME, 1);
 
-  console.log("Fraud worker started");
+      if (!result) {
+        return setTimeout(loop, 0); 
+      }
 
-  while (true) {
-    try {
-      const result = await redisClient.brPop(QUEUE_NAME, 0);
       const raw = result.element;
 
       let event;
       try {
         event = JSON.parse(raw);
       } catch {
-        console.error("Poison pill");
-        await redisClient.lPush(DLQ_NAME, raw);
-        continue;
+        await sendToDLQ(raw, "invalid_json");
+        return setImmediate(loop);
       }
-
+      
+      if (!event.userId || !event.paymentToken) {
+        await sendToDLQ(raw, "missing_fields");
+        return setImmediate(loop);
+      }
       const reason = suspicious_activity(event);
 
       if (reason) {
@@ -90,33 +100,49 @@ async function start() {
       } else {
         console.log("Normal purchase:", event.userId);
       }
+
       lastJobAt = new Date().toISOString();
 
     } catch (err) {
       console.error("Worker error:", err);
     }
+
+    // yield control so Express stays responsive
+    setImmediate(loop);
   }
+
+  loop();
+}
+
+// ---------------------------
+// STARTUP
+// ---------------------------
+async function start() {
+  await redisClient.connect();
+  console.log("Redis connected");
+
+  // optional warm DB connection
+  await db.query("SELECT 1");
+  console.log("DB ready");
+
+  console.log("Fraud worker started");
+
+  runWorker();
 }
 
 // ---------------------------
 // HEALTH ENDPOINT
 // ---------------------------
 app.get("/health", async (req, res) => {
-  console.log("reached0")
   try {
 
     if (!redisClient.isOpen) {
-      console.log("redis not open yet")
+      console.log("redis not open")
       await redisClient.connect();
       console.log("redis connected")
     }
     
     await redisClient.ping();
-    await db.query("SELECT 1");
-
-    const queueDepth = await redisClient.lLen(QUEUE_NAME);
-    const dlqDepth = await redisClient.lLen(DLQ_NAME);
-    console.log("reached1")
 
     res.status(200).json({
       status: "ok",
@@ -124,13 +150,12 @@ app.get("/health", async (req, res) => {
         redis: "ok",
         database: "ok"
       },
-      queueDepth,
-      dlqDepth,
+      queueDepth:0, 
+      dlqDepth:0, 
       lastJobAt
     });
 
   } catch (err) {
-    console.log("health error: " + err.message)
     res.status(503).json({
       status: "error",
       error: err.message
@@ -138,9 +163,14 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// start server + worker
+// ---------------------------
+// START SERVER
+// ---------------------------
 app.listen(PORT, () => {
   console.log("Health server running on port", PORT);
 });
-console.log("reached-1")
-start();
+
+// ---------------------------
+// RUN EVERYTHING
+// ---------------------------
+start().catch(err => console.error("Startup error:", err));

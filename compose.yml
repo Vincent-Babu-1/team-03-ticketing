@@ -219,6 +219,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - PIPELINE=team-03
       - QUEUE_NAME=refundRequests
+      - CHECK_PURCHASE_URL=http://purchase-service:3001/purchases/
+      - REVERSE_PAYMENT_URL=http://payment-service:3001/reverse
     depends_on:
       refund-db:
         condition: service_healthy
@@ -289,7 +291,7 @@ services:
     networks:
       - team-net
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://analytics-worker:3007/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://analytics-worker:3001/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -329,6 +331,7 @@ services:
         - "5436:5432"
      volumes:
        - analytics-db-data:/var/lib/postgresql/data
+       - ./DB-folder/DB-analytics.sql:/docker-entrypoint-initdb.d/init.sql:ro
      networks:
        - team-net
      healthcheck:
