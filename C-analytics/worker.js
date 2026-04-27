@@ -173,4 +173,8 @@ async function handleEvent(event) {
   }
 }
 
+app.listen(PORT, () => {
+  console.log(`[analytics-worker] health server listening on port ${PORT}`);
+});
+
 run();
