@@ -16,7 +16,7 @@
 | -------------------- | ------------------------------------------------------------- |
 | Benson Zheng         | event catalog service                                         |
 | Helektra Katsoulakis | analytics worker + analytics db                               |
-| Julia Farber         | purchase db + payment service                                 |
+| Julia Farber         | purchase db + payment service + purchase service partially    |
 | Katelyn Leung        | events db + notif. service                                    |
 | Maria Mechery        | ticket purchase service + user waitlist worker                |
 | Tien Nguyen          | fraud detection service + worker                              |
@@ -50,7 +50,9 @@ docker compose exec holmes bash
 ### Base URLs (development)
 
 ```
-refund-service         http://refund-service:3001
+refund-service         http://refund-service:3001, health endpoint: http://refund-service:3001/health
+purchase-service       http://purchase-service:3002, health endpoint: http://purchase-service:3001/health
+payment-service        http://payment-service:3003, health endpoint: http://payment-service:3001/health
 [your-service-name]    http://localhost:[port]
 [worker-name]          http://localhost:[port]   (health endpoint only)
 holmes                 (no port — access via exec)
@@ -70,6 +72,8 @@ Include which service calls which, what queues exist, and how data flows.]
 
 [Each of us can add to this paragraph with our section of the system.]
 
+Purchases are sent to purchase-request which then reserves a seat, then calls payment service to process payment, and then will confirm the purchase if successful. If the purchase fails, the seat is released back and notifies the waitlist worker. Upon success, the notification system is notified, analytics is notified, fraud is notified so it can gather data to notice patterns. Payment service is called by purchase service. Payment service is also called by refund service to refund a purchase, which validates if it exists and if it is refundable, and updates the seat reservation database and calls waitlist worker that there is avaliable seating, so the waitlist worker can allow waitlisted to make purchases on now availiable tickets.
+
 Refund requests are sent to the Refund service, which checks the Refund database and synchronously calls the Purchase service to determine whether the request is valid. If the request is valid, then the request is noted in the Refund database as successful and the Payment service is contacted to reverse the charge.
 
 
@@ -88,10 +92,92 @@ Refund requests are sent to the Refund service, which checks the Refund database
 
 ---
 
+## Purchase Service
+
+### GET /health 
+Returns 200 if healthy, 503 if unhealthy/down.
+```bash curl http://purchase-service:3001/health```
+{"service":"purchase","status":"ok","db":"ok","redis":"ok"}
+
+### POST /purchases
+Creates a new ticket purchase. Reserves a seat, calls payment service, confirms if successful payment or 
+releases the seat if unsuccessful payment. Idempotent on Idempotency-Key header.
+curl -X POST http://purchase-service:3001/purchases \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: aaaaaaaa-0000-0000-0000-000000000001" \
+  -d '{"userId": "bbbbbbbb-0000-0000-0000-000000000001", "eventId": "cccccccc-0000-0000-0000-000000000001", "cardToken": "test-card", "seats": ["A1", "A2"]}' | jq .
+{
+  "purchaseId": "d0f2426b-20c7-4fbf-90cb-743d0ae00a5e",
+  "userId": "bbbbbbbb-0000-0000-0000-000000000001",
+  "eventId": "cccccccc-0000-0000-0000-000000000001",
+  "seats": [
+    "A1",
+    "A2"
+  ],
+  "quantity": 2,
+  "totalUsd": 446,
+  "status": "confirmed",
+  "createdAt": "2026-04-26T22:39:18.092Z"
+}
+
+### GET /purchases/:id
+Looks up and returns a single purchase by its id (purchase id)
+curl http://purchase-service:3001/purchases/d0f2426b-20c7-4fbf-90cb-743d0ae00a5e
+{"error":"Purchase not found"} if not found.
+{"id":"d0f2426b-20c7-4fbf-90cb-743d0ae00a5e","idempotency_key":"aaaaaaaa-0000-0000-0000-000000000001","user_id":"bbbbbbbb-0000-0000-0000-000000000001","event_id":"cccccccc-0000-0000-0000-000000000001","seats":["A1","A2"],"quantity":2,"total_usd":"446.00","card_token":"test-card","status":"confirmed","created_at":"2026-04-26T22:39:18.087Z"} if found.
+
+### GET /reservations/:id
+Looks up and returns a single reservation by its id (reservation id, but id in the reservations table)
+curl http://purchase-service:3001/reservations/aaaaaaaa-0000-0000-0000-000000000001
+{"error":"Reservation not found"} or 
+{
+  "id": "uuid",
+  "purchase_id": "uuid",
+  "event_id": "uuid",
+  "seats": ["A1", "A2"],
+  "quantity": 2,
+  "status": "confirmed",
+  "created_at": "2026-04-26T21:46:00.139Z",
+  "updated_at": "2026-04-26T21:46:00.139Z"
+}
+
+---
+
+## Payment Service
+
+### GET /health 
+curl http://payment-service:3001/health
+{"service":"payment-service","status":"ok","db":"ok","redis":"ok"}
+Returns 200 if healthy, 503 if unhealthy/down.
+
+### POST /payments
+Called by purchase-service only to trigger a payment. Processes a simulated (I/O simulation) payment for a purchase. 
+Idempotent on purchase_id, preventing duplicate charging.
+curl -X POST http://payment-service:3001/payments \
+  -H "Content-Type: application/json" \
+  -d '{"purchase_id": "aaaaaaaa-0000-0000-0000-000000000001", "amount": 204.00, "cardToken": "test-card"}'
+{"payment_id":"cc34f7bc-9033-44e7-b5d4-423e65b08732","purchase_id":"aaaaaaaa-0000-0000-0000-000000000001","status":"success","amount":"204.00"}
+
+### GET /payments/:purchase_id
+Look up and return a payment record by its purchase_id.
+curl http://payment-service:3001/payments/aaaaaaaa-0000-0000-0000-000000000001
+{"id":"cc34f7bc-9033-44e7-b5d4-423e65b08732","purchase_id":"aaaaaaaa-0000-0000-0000-000000000001",
+"refund_id":null,"total_usd":"204.00","status":"succeeded","created_at":"2026-04-26T22:45:52.305Z",
+"updated_at":"2026-04-26T22:45:52.305Z"}
+
+### POST /payments/reverse
+Reverses a payment (refunds). Called by refund service only to trigger payment-service to refund. Idempotent on purchase_id,
+and ensures that there exists a successful payment so no fraud occurs.
+curl -X POST http://payment-service:3001/payments/reverse \
+  -H "Content-Type: application/json" \
+  -d '{"purchase_id": "aaaaaaaa-0000-0000-0000-000000000001", "refund_id": "dddddddd-0000-0000-0000-000000000001"}'
+{"payment_id":"cc34f7bc-9033-44e7-b5d4-423e65b08732","refund_id":"dddddddd-0000-0000-0000-000000000001",
+"purchase_id":"aaaaaaaa-0000-0000-0000-000000000001","status":"refunded","total_usd":"204.00"}
+---
+
 ## Refund Service
 
 ### GET /health
-
 ```
 GET /health
   Returns the health status of this service and its dependencies.
