@@ -47,7 +47,16 @@ function suspicious_activity(event) {
 
   return null;
 }
+async function sendToDLQ(raw, reason) {
+  const entry = {
+    raw,
+    reason,
+    timestamp: new Date().toISOString(),
+  };
 
+  await redisClient.rPush(DLQ_NAME, JSON.stringify(entry));
+  console.log("Sent to DLQ:", reason);
+}
 // ---------------------------
 // WORKER LOOP (non-blocking)
 // ---------------------------
@@ -66,11 +75,14 @@ function runWorker() {
       try {
         event = JSON.parse(raw);
       } catch {
-        console.error("Poison pill");
-        await redisClient.lPush(DLQ_NAME, raw);
+        await sendToDLQ(raw, "invalid_json");
         return setImmediate(loop);
       }
-
+      
+      if (!event.userId || !event.paymentToken) {
+        await sendToDLQ(raw, "missing_fields");
+        return setImmediate(loop);
+      }
       const reason = suspicious_activity(event);
 
       if (reason) {

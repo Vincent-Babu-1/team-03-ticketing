@@ -5,21 +5,38 @@ const QUEUE = 'waitlist-queue';
 const DLQ = 'waitlist-queue:dlq';
 const PORT = 3000;
 
+// The pub/sub channel the Refund Service publishes to when a seat is released
+const SEAT_RELEASED_CHANNEL = 'seat-released';
+
 // Connect to Redis
 const redis = createClient({
   url: process.env.REDIS_URL || 'redis://redis:6379'
 });
 
+//Connect to subscriber
 const subscriber = createClient({
   url: process.env.REDIS_URL || 'redis://redis:6379'
 });
 
+redis.on('error', (err) => console.error('[redis] error:', err.message));
+subscriber.on('error', (err) => console.error('Subscriber error:', err.message));
+
+
 await redis.connect();
 await subscriber.connect();
 console.log('waitlist-worker connected to Redis');
-console.log('waitlist-worker listening on waitlist-queue...');
 
-// Track some stats for the health endpoint
+// Refund Service publishes to seat-released, then push to waitlist-queue
+await subscriber.subscribe(SEAT_RELEASED_CHANNEL, (message) => {
+  console.log('Seat released event received - pushing to waitlist-queue:', message);
+  redis.rPush(QUEUE, message).catch((err) => {
+    console.error('Failed to push seat-released message to waitlist-queue:', err.message);
+  });
+});
+console.log('Subscribed to', SEAT_RELEASED_CHANNEL);
+console.log('Listening for messages on', QUEUE);
+
+// Track stats for the health endpoint
 let lastJobAt = null;
 let jobsProcessed = 0;
 
@@ -45,19 +62,28 @@ async function processEntry(raw) {
 
   // Valid entry — promote the user by publishing to confirmed-purchases
   // The Notification Service is subscribed to this channel
-  const message = JSON.stringify({
-    type: 'waitlist-promotion',
-    userId: entry.userId,
-    eventId: entry.eventId,
-    promotedAt: new Date().toISOString(),
-  });
-  await redis.publish('confirmed-purchases', message);
+  try{
+    const message = JSON.stringify({
+      type: 'waitlist-promotion',
+      userId: entry.userId,
+      eventId: entry.eventId,
+      promotedAt: new Date().toISOString(),
+    });
+    
+    await redis.publish('confirmed-purchases', message);
 
-  // Update stats
-  jobsProcessed = jobsProcessed + 1;
-  lastJobAt = new Date().toISOString();
+    // Update stats
+    jobsProcessed = jobsProcessed + 1;
+    lastJobAt = new Date().toISOString();
 
-  console.log('Promoted waitlisted user:', { userId: entry.userId, eventId: entry.eventId });
+    console.log('Promoted waitlisted user:', { userId: entry.userId, eventId: entry.eventId });
+
+  } catch (err) {
+    // Something unexpected went wrong (like Redis being temporarily down).
+    // Send to DLQ instead of retrying forever.
+    console.error('Unexpected error, moving message to DLQ:', err.message);
+    await redis.rPush(DLQ, raw);
+  }
 }
 
 // Health endpoint so docker compose ps shows (healthy)
@@ -95,7 +121,7 @@ app.listen(PORT, () => {
 async function startWorker() {
   while (true) {
     try {
-      const result = await subscriber.blPop(QUEUE, 5);
+      const result = await redis.blPop(QUEUE, 5);
       if (result) {
         await processEntry(result.element);
       }
