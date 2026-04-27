@@ -45,3 +45,9 @@ Then open:
 ```text
 http://localhost
 ```
+
+## Verifying services work
+
+```bash
+docker compose logs -f caddy event-cat-service purchase-service payment-service
+```
