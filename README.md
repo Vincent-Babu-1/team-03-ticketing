@@ -271,6 +271,43 @@ curl -s -X POST http://refund-service:3001/refund-request \
   "failureReason": "idempotency_skip"
 }
 ```
+### Notification Service 
+
+### GET /health
+```
+GET /health
+  Returns the health status of this service and its dependencies.
+  Responses:
+    200  Service and all dependencies healthy
+    503  One or more dependencies unreachable
+```
+
+**Example request:**
+
+```bash
+curl http://refund-service:3001/health | jq .
+```
+
+**Example response (200):**
+
+```json
+{
+  "status": "healthy",
+  "db": "ok",
+  "redis": "ok"
+}
+```
+
+**Example response (503):**
+
+```json
+{
+  "status": "unhealthy",
+  "db": "ok",
+  "redis": "error: connection refused"
+}
+```
+
 
 
 ---
