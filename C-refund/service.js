@@ -220,7 +220,8 @@ k6 run --summary-export results/k6-sprint-3-poison-output-summary.json /workspac
 
 healthcheck http://purchase-service:3001/health
 curl http://purchase-service:3001/health | jq .
-curl http://analytics-worker:3000/health | jq
+curl http://analytics-worker:3001/health | jq
+redis-cli -h redis RPUSH analytics-queue '{"this": "is malformed"}'
 
 curl -s -X GET http://event-cat-service:3001/events/0e350ac0-a8f1-4a7a-9191-806716cc6181 \
   -H "Content-Type: application/json" \

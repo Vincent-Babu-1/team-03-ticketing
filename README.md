@@ -62,10 +62,14 @@ Both are served through Caddy on port 80.
 
 ```
 refund-service         http://refund-service:3001, health endpoint: http://refund-service:3001/health
-purchase-service       http://purchase-service:3002, health endpoint: http://purchase-service:3001/health
-payment-service        http://payment-service:3003, health endpoint: http://payment-service:3001/health
-[your-service-name]    http://localhost:[port]
-[worker-name]          http://localhost:[port]   (health endpoint only)
+purchase-service       http://purchase-service:3001, health endpoint: http://purchase-service:3001/health
+payment-service        http://payment-service:3001, health endpoint: http://payment-service:3001/health
+event-catalog-service  http://event-cat-service:3001, health endpoint: http://event-cat-service:3001/health
+notification-service   http://notification-service:3001, health endpoint: http://notification-service:3001/health
+notification-worker    http://notification-worker:3001, health endpoint: http://notification-worker:3001/health
+waitlist-worker        http://waitlist-worker:3000, health endpoint: http://waitlist-worker:3000/health
+fraud-worker           http://fraud-worker:3008, health endpoint: http://fraud-worker:3008/health
+analytics-worker       http://analytics-worker:3001, health endpoint: http://analytics-worker:3001/health
 holmes                 (no port — access via exec)
 ```
 
