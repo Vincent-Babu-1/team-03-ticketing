@@ -202,7 +202,7 @@ await pool.query(`
 /*
 docker compose exec holmes bash
 
-k6 run /workspace/k6/sprint-2-cache.js
+k6 run /workspace/k6/sprint-3-poison.js
 curl http://fraud-worker:3000/health | jq .
 
 psql postgres://user:pass@refund-db:5432/refunddb
@@ -216,11 +216,12 @@ SELECT table_name
 SELECT * FROM refunds;
 
 mkdir -p results
-k6 run --summary-export results/k6-sprint-2-async-output-summary.json /workspace/k6/sprint-2-async.js | tee results/k6-sprint-2-async-output.txt
+k6 run --summary-export results/k6-sprint-3-poison-output-summary.json /workspace/k6/sprint-3-poison.js | tee results/k6-sprint-3-poison-output.txt
 
 healthcheck http://purchase-service:3001/health
-curl http://refund-service:3001/health | jq .
-curl http://analytics-worker:3000/health | jq
+curl http://purchase-service:3001/health | jq .
+curl http://analytics-worker:3001/health | jq
+redis-cli -h redis RPUSH analytics-queue '{"this": "is malformed"}'
 
 curl -s -X GET http://event-cat-service:3001/events/0e350ac0-a8f1-4a7a-9191-806716cc6181 \
   -H "Content-Type: application/json" \
@@ -238,7 +239,6 @@ curl -s -X POST http://payment-service:3001/payments \
 
 curl -s -X POST http://purchase-service:3001/purchases \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12" \
-  -d '{"userId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", "eventId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11", "quantity": 2, "cardToken": "test-card-1"}' | jq .
-
+  -H "Idempotency-Key: aaaaaaaa-0000-0000-0000-000000000001" \
+  -d '{"userId": "bbbbbbbb-0000-0000-0000-000000000001", "eventId": "cccccccc-0000-0000-0000-000000000001", "cardToken": "test-card", "seats": ["A1", "A2"]}' | jq .
 */
