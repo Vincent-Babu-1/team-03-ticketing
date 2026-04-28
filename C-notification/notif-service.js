@@ -23,8 +23,13 @@ async function startWorker() {
     try {
       const data = JSON.parse(message);
 
+      //Checks if the data is valid
+      if (!data.userId || !data.purchaseId || !data.eventId) {
+        throw new Error("INVALID_FORMAT");
+      }
+      else{
       console.log("Received confirmed purchase:");
-      console.log(data);
+      console.log(data);}
 
       // simulate email sending
       const emailLog = `
@@ -43,7 +48,7 @@ async function startWorker() {
 
     } catch (err) {
       console.error("Failed to process message:", err);
-    }
+    } 
   });
 
   console.log(`Listening on ${CHANNEL}...`);
