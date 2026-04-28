@@ -43,15 +43,14 @@ async function startWorker() {
   await redisSubscriber.subscribe(CHANNEL, async (message) => {
     let data;
     try {
-      const data = JSON.parse(message);
+       data = JSON.parse(message);
 
       //Checks if the data is valid
       if (!data.userId || !data.purchaseId || !data.eventId) {
         throw new Error("INVALID_FORMAT");
       }
-      else{
-      console.log("Received confirmed purchase:");
-      console.log(data);}
+      
+      console.log("Received confirmed purchase:", data.purchaseId);
 
       // simulate email sending
       const emailLog = `
@@ -69,8 +68,21 @@ async function startWorker() {
       // fs.appendFileSync("emails.log", emailLog);
 
     } catch (err) {
-      console.error("Failed to process message:", err);
-    } 
+      console.error("[PARSE ERROR] Dropping unparseable message:", message);
+      let lastErr;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        await processMessage(data);
+        if (attempt > 1) console.log(`[RETRY] ✓ Succeeded on attempt ${attempt}`);
+        return;
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[RETRY] Attempt ${attempt}/${MAX_RETRIES} failed for purchaseId=${data.purchaseId}: ${err.message}`);
+      }
+    }
+
+    await sendToDLQ(data, lastErr.message);
+  }
   });
 
   console.log(`Listening on ${CHANNEL}...`);
