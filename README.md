@@ -47,14 +47,29 @@ docker compose logs -f
 docker compose exec holmes bash
 ```
 
+### Frontend URLs
+
+```text
+Customer demo UI        http://localhost
+Developer dashboard     http://localhost/dev/
+```
+
+The customer-facing UI lives in `ui/user/`.
+The developer dashboard lives in `ui/dev/`.
+Both are served through Caddy on port 80.
+
 ### Base URLs (development)
 
 ```
 refund-service         http://refund-service:3001, health endpoint: http://refund-service:3001/health
-purchase-service       http://purchase-service:3002, health endpoint: http://purchase-service:3001/health
-payment-service        http://payment-service:3003, health endpoint: http://payment-service:3001/health
-[your-service-name]    http://localhost:[port]
-[worker-name]          http://localhost:[port]   (health endpoint only)
+purchase-service       http://purchase-service:3001, health endpoint: http://purchase-service:3001/health
+payment-service        http://payment-service:3001, health endpoint: http://payment-service:3001/health
+event-catalog-service  http://event-cat-service:3001, health endpoint: http://event-cat-service:3001/health
+notification-service   http://notification-service:3001, health endpoint: http://notification-service:3001/health
+notification-worker    http://notification-worker:3001, health endpoint: http://notification-worker:3001/health
+waitlist-worker        http://waitlist-worker:3000, health endpoint: http://waitlist-worker:3000/health
+fraud-worker           http://fraud-worker:3008, health endpoint: http://fraud-worker:3008/health
+analytics-worker       http://analytics-worker:3001, health endpoint: http://analytics-worker:3001/health
 holmes                 (no port — access via exec)
 ```
 
@@ -75,6 +90,18 @@ Include which service calls which, what queues exist, and how data flows.]
 Purchases are sent to purchase-request which then reserves a seat, then calls payment service to process payment, and then will confirm the purchase if successful. If the purchase fails, the seat is released back and notifies the waitlist worker. Upon success, the notification system is notified, analytics is notified, fraud is notified so it can gather data to notice patterns. Payment service is called by purchase service. Payment service is also called by refund service to refund a purchase, which validates if it exists and if it is refundable, and updates the seat reservation database and calls waitlist worker that there is avaliable seating, so the waitlist worker can allow waitlisted to make purchases on now availiable tickets.
 
 Refund requests are sent to the Refund service, which checks the Refund database and synchronously calls the Purchase service to determine whether the request is valid. If the request is valid, then the request is noted in the Refund database as successful and the Payment service is contacted to reverse the charge.
+
+## Frontend Overview
+
+The repository now includes two static frontend surfaces under `ui/`:
+
+1. `ui/user/`
+The customer-facing ticket purchase demo. It loads events from the event catalog service, lets a user choose a section and quantity, and submits purchases through the purchase service.
+
+2. `ui/dev/`
+The developer dashboard. It provides a lightweight system overview for service and worker health, queue backlog visibility when a service reports it, and a quick visual reference for how the ticketing flow moves through the system.
+
+Caddy serves both frontends. It rewrites `/` to the customer UI and serves the developer dashboard at `/dev/`. It also proxies same-origin health endpoints for the developer dashboard under `/api/system/...`.
 
 
 ---
@@ -271,69 +298,104 @@ curl -s -X POST http://refund-service:3001/refund-request \
   "failureReason": "idempotency_skip"
 }
 ```
-## Analytics Worker
-
-The Analytics Worker consumes purchase and browse events from the `analytics-queue` Redis queue and writes aggregate stats to the analytics DB. Invalid or malformed events are routed to the `analytics-queue:dlq` dead letter queue.
+## Notification Service
 
 ### GET /health
-Returns 200 if DB and Redis are healthy, 503 if degraded. Also returns queue depth, DLQ depth, and last processed job timestamp.
+```
+GET /health
+  Returns the health status of this service and its dependencies.
+  Responses:
+    200  Service and all dependencies healthy
+    503  One or more dependencies unreachable
+```
+
+**Example request:**
+
 ```bash
-curl http://analytics-worker:3001/health | jq .
+curl http://notif-service:3001/health | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
-  "service": "analytics-worker",
+  "ok": true,
   "status": "ok",
-  "queueDepth": 0,
-  "dlqDepth": 0,
-  "lastJobAt": "2026-04-27T12:00:00.000Z",
-  "db": "ok",
-  "redis": "ok"
+  "service": "notif-service"
 }
 ```
 
-### GET /analytics
-Returns aggregate ticket sales and browse counts for all events from the analytics DB.
+**Example response (503):**
+
+```json
+{
+  "ok": false,
+  "status": "redis-not-ready",
+  "service": "notif-service"
+}
+```
+
+---
+
+### GET /dlq
+
+```
+GET /dlq
+  Returns all messages currently sitting in the dead letter queue.
+  Responses:
+    200  DLQ contents returned (empty array if none)
+```
+
+**Example request:**
+
 ```bash
-curl http://analytics-worker:3001/analytics | jq .
+curl http://notif-service:3001/dlq | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
-  "events": [
+  "count": 1,
+  "items": [
     {
-      "event_id": "cccccccc-0000-0000-0000-000000000001",
-      "tickets_sold": 1,
-      "browse_count": 0,
-      "updated_at": "2026-04-27T12:00:00.000Z"
+      "data": {
+        "userId": "user-123",
+        "purchaseId": "df33337e-9fac-4854-9ad8-3af18d822cfc",
+        "eventId": "evt-456"
+      },
+      "reason": "Email provider unreachable",
+      "failedAt": "2024-11-01T12:34:56.000Z"
     }
   ]
 }
 ```
 
-### Testing
+---
 
-Inject a valid purchase event directly into the queue:
-```bash
-redis-cli -h redis RPUSH analytics-queue '{"event":"ticket_purchased","purchaseId":"aaaaaaaa-0000-0000-0000-000000000001","eventId":"cccccccc-0000-0000-0000-000000000001","quantity":2}'
+### POST /dlq/requeue
+
+```
+POST /dlq/requeue
+  Re-publishes all dead-lettered messages back onto the confirmed-purchases
+  channel, clearing the DLQ. Each message will go through the full retry
+  logic again.
+  Responses:
+    200  All dead letters requeued successfully
 ```
 
-Then verify it was recorded:
+**Example request:**
+
 ```bash
-curl http://analytics-worker:3001/analytics | jq .
+curl -s -X POST http://notif-service:3001/dlq/requeue | jq .
 ```
 
-Inject invalid data to test DLQ:
-```bash
-redis-cli -h redis RPUSH analytics-queue '{"event":"ticket_purchased","purchaseId":"missing-event-id"}'
-```
+**Example response (200):**
 
-Verify DLQ depth increased:
-```bash
-curl http://analytics-worker:3001/health | jq '{dlqDepth}'
+```json
+{
+  "requeued": 3
+}
 ```
 
 ---
