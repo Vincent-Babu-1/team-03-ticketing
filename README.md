@@ -402,7 +402,7 @@ curl -s -X POST http://notif-service:3001/dlq/requeue | jq .
 
 ## Analytics Worker
 
-The Analytics Worker consumes purchase and browse events from the `analytics-queue` Redis queue and writes aggregate stats to the analytics DB. Invalid or malformed events are routed to the `analytics-queue:dlq` dead letter queue.
+The Analytics Worker takes purchase and browse events from the `analytics-queue` Redis queue and writes aggregate stats to the analytics DB. Invalid events are routed to the `analytics-queue:dlq` dead letter queue.
 
 ### GET /health
 Returns 200 if DB and Redis are healthy, 503 if degraded. Also returns queue depth, DLQ depth, and last processed job timestamp.
