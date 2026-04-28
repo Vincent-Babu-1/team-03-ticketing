@@ -43,7 +43,6 @@ async function startWorker() {
   await redisSubscriber.subscribe(CHANNEL, async (message) => {
     let data;
     try {
-<<<<<<< HEAD
       const data = JSON.parse(message);
 
       //Checks if the data is valid
@@ -72,27 +71,6 @@ async function startWorker() {
     } catch (err) {
       console.error("Failed to process message:", err);
     } 
-=======
-      data = JSON.parse(message);
-    } catch {
-      console.error("[PARSE ERROR] Dropping unparseable message:", message);
-      return;
-    }
-
-    let lastErr;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        await processMessage(data);
-        if (attempt > 1) console.log(`[RETRY] ✓ Succeeded on attempt ${attempt}`);
-        return;
-      } catch (err) {
-        lastErr = err;
-        console.warn(`[RETRY] Attempt ${attempt}/${MAX_RETRIES} failed for purchaseId=${data.purchaseId}: ${err.message}`);
-      }
-    }
-
-    await sendToDLQ(data, lastErr.message);
->>>>>>> 4773e22e53059d5bb883980b073ed8f1b788cb2e
   });
 
   console.log(`Listening on ${CHANNEL}...`);
