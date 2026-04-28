@@ -11,7 +11,7 @@ console.log('[analytics-worker] connected to Redis');
 
 // Blocking pop — waits until an item is available on the queue
 export async function popFromQueue(queue) {
-  const result = await redis.brPop(queue, 0); // 0 = block forever
+  const result = await redis.brPop(queue, 1); // unblock every second 
   if (!result) return null;
   return JSON.parse(result.element);
 }
