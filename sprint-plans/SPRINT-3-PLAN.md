@@ -1,4 +1,4 @@
-# Sprint 3 Plan — [Team Name]
+# Sprint 3 Plan — Team 3
 
 **Sprint:** 3 — Reliability and Poison Pills  
 **Dates:** 04.21 → 04.28  
@@ -10,8 +10,6 @@
 
 Every worker will have a dead letter queue by the end of the sprint. The worker will continue working even after the poison pills. All components from your chosen system description are implemented and running and they all need a health endpoint. The Payment service, Event Catalog Service, Notification Service will be the three failure scenarios. 
 ---
-
-## Ownership
 
 ## Ownership
 

@@ -13,6 +13,9 @@
       <p class="hero-copy">
         Browse available events, pick one, and submit a ticket purchase through the live services.
       </p>
+      <p class="hero-actions">
+        <a class="ghost-link" href="/dev/">Open developer system overview</a>
+      </p>
     </section>
 
     <section class="content-grid">
@@ -34,10 +37,19 @@
           Select an event to start your purchase.
         </div>
 
+        <div id="section-summary" class="section-summary hidden"></div>
+
         <form id="purchase-form" class="purchase-form">
           <label>
             Your name
             <input id="user-name" name="userName" type="text" placeholder="Alex Morgan" required>
+          </label>
+
+          <label>
+            Section
+            <select id="section-select" name="sectionId" required disabled>
+              <option value="">Select a section</option>
+            </select>
           </label>
 
           <label>
@@ -60,6 +72,6 @@
     </section>
   </main>
 
-  <script src="/app.js" defer></script>
+  <script src="/user/app.js" defer></script>
 </body>
 </html>

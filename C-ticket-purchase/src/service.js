@@ -8,6 +8,61 @@ app.use(express.json());
 
 const PORT = 3001;
 const PAYMENT_SERVICE_URL = process.env.PAYMENT_SERVICE_URL || 'http://payment-service:3001';
+const EVENT_CATALOG_URL = process.env.EVENT_CATALOG_URL || 'http://event-cat-service:3001';
+
+function parseSeatLabel(label) {
+  const [row, seatNumberText] = String(label).split('-');
+  return {
+    row,
+    seatNumber: Number(seatNumberText)
+  };
+}
+
+async function syncSeatStatuses(eventId, seatLabels, newStatus) {
+  const sectionsRes = await fetch(`${EVENT_CATALOG_URL}/events/${eventId}/sections`);
+  if (!sectionsRes.ok) {
+    throw new Error(`Failed to load event sections: ${sectionsRes.status}`);
+  }
+
+  const sections = await sectionsRes.json();
+
+  for (const label of seatLabels) {
+    const { row, seatNumber } = parseSeatLabel(label);
+    if (!row || Number.isNaN(seatNumber)) {
+      throw new Error(`Invalid seat label format: ${label}`);
+    }
+
+    const section = sections.find((item) => item.section_name === row);
+    if (!section) {
+      throw new Error(`Could not find section for seat label ${label}`);
+    }
+
+    const seatsRes = await fetch(`${EVENT_CATALOG_URL}/events/${eventId}/sections/${section.id}/seats`);
+    if (!seatsRes.ok) {
+      throw new Error(`Failed to load seats for section ${section.id}: ${seatsRes.status}`);
+    }
+
+    const seats = await seatsRes.json();
+    const seat = seats.find((item) => item.row === row && Number(item.seat_number) === seatNumber);
+    if (!seat) {
+      throw new Error(`Could not find seat ${label} in event catalog`);
+    }
+
+    const updateRes = await fetch(`${EVENT_CATALOG_URL}/events/${eventId}/sections/${section.id}/seats/${seat.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+
+    if (!updateRes.ok) {
+      throw new Error(`Failed to update seat ${label} to ${newStatus}: ${updateRes.status}`);
+    }
+  }
+}
+
+const isValidUUID = (id) => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
 
 // http://localhost:3002/ -- Checking that its up on port 3002.
 app.get("/", (req, res) => {
@@ -58,6 +113,9 @@ app.post('/purchases', async (req, res) => {
   const idempotencyKey = req.headers['idempotency-key'];
   if (!idempotencyKey) {
     return res.status(400).json({ error: 'Idempotency-Key header is required' });
+  }
+  if (!isValidUUID(idempotencyKey)){
+    return res.status(400).json({ error: 'Idempotency-Key header is wrong format (expected UUID)' });
   }
 
   // Gets the fields from the request body & checks if anything missing
@@ -133,6 +191,13 @@ app.post('/purchases', async (req, res) => {
       `UPDATE reservations SET status = 'confirmed', updated_at = NOW() WHERE id = $1`,
       [reservationId]
     );
+
+    try {
+      await syncSeatStatuses(eventId, seats, 'sold');
+    } catch (err) {
+      console.log(`purchase ${idempotencyKey}: failed to sync sold seats with event catalog`, err);
+    }
+
     // Save confirmed purchase
     await pool.query(
       `INSERT INTO purchases (id, idempotency_key, user_id, event_id, seats, quantity, total_usd, card_token, status)
@@ -161,6 +226,13 @@ app.post('/purchases', async (req, res) => {
       `UPDATE reservations SET status = 'released', updated_at = NOW() WHERE id = $1`,
       [reservationId]
     );
+
+    try {
+      await syncSeatStatuses(eventId, seats, 'available');
+    } catch (err) {
+      console.log(`purchase ${idempotencyKey}: failed to sync released seats with event catalog`, err);
+    }
+
     // Push released seats to waitlist so Waitlist Worker can promote next user
     await redis.rPush('waitlist-queue', JSON.stringify({ eventId, seats }));
  

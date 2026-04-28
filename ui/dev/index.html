@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TicketFlow Dev Overview</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <h1>System Overview</h1>
+      <p class="hero-copy">
+        Monitor service health, worker activity, and queue pressure while you develop the ticketing platform.
+      </p>
+      <p class="hero-actions">
+        <a class="ghost-link" href="/">Back to customer demo</a>
+      </p>
+    </section>
+
+    <section class="summary-grid" aria-label="System summary">
+      <article class="summary-card">
+        <p class="summary-label">Healthy services</p>
+        <p id="healthy-count" class="summary-value">-</p>
+      </article>
+      <article class="summary-card">
+        <p class="summary-label">Degraded or down</p>
+        <p id="problem-count" class="summary-value">-</p>
+      </article>
+      <article class="summary-card">
+        <p class="summary-label">Queues with backlog</p>
+        <p id="queue-count" class="summary-value">-</p>
+      </article>
+      <article class="summary-card">
+        <p class="summary-label">Last refresh</p>
+        <p id="last-refresh" class="summary-value">--:--</p>
+      </article>
+    </section>
+
+    <section class="section-stack">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Services</h2>
+          <button id="refresh-button" class="ghost-button" type="button">Refresh now</button>
+        </div>
+        <p id="services-status" class="status-text">Loading service health...</p>
+        <div id="services-grid" class="services-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Infrastructure</h2>
+        </div>
+        <p class="status-text">
+          These checks are inferred from each service's health response, so they show what the app can actually reach right now.
+        </p>
+        <div id="infra-grid" class="infra-grid"></div>
+      </section>
+
+      <section class="flow-card">
+        <h2>Core Ticketing Flow</h2>
+        <p class="flow-copy">
+          A quick reference for how requests and side effects move through the system during development.
+        </p>
+        <div class="flow-grid">
+          <div class="flow-row">
+            <div class="flow-node">UI</div>
+            <div class="flow-arrow">-&gt;</div>
+            <div class="flow-node">Event Catalog</div>
+            <div class="flow-arrow">-&gt;</div>
+            <div class="flow-node">Purchase</div>
+            <div class="flow-arrow">-&gt;</div>
+            <div class="flow-node">Payment</div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-node">Purchase</div>
+            <div class="flow-arrow">-&gt;</div>
+            <div class="flow-node">Notification</div>
+            <div class="flow-arrow">+</div>
+            <div class="flow-node">Analytics</div>
+            <div class="flow-arrow">+</div>
+            <div class="flow-node">Fraud</div>
+          </div>
+          <div class="flow-row">
+            <div class="flow-node">Refund</div>
+            <div class="flow-arrow">-&gt;</div>
+            <div class="flow-node">Payment Reverse</div>
+            <div class="flow-arrow">-&gt;</div>
+            <div class="flow-node">Seat Released</div>
+            <div class="flow-arrow">-&gt;</div>
+            <div class="flow-node">Waitlist Worker</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="alert-card">
+        <h2>Recent Issues</h2>
+        <div id="alert-list" class="alert-list">
+          <div class="alert-item">Loading alerts...</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/dev/dev.js" defer></script>
+</body>
+</html>
