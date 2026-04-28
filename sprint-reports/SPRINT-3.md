@@ -8,11 +8,7 @@
 
 ## What We Built
 
-[What failure scenarios does the system now handle? Which queues have DLQ handling? What happens when a poison pill is injected?]
-
-The Event Catalog service now has frequent regex checks to determine if the inputted event, seat, or section ID is a valid UUID-formatted string, each attached to Error 400 messages if the checks fail. The Purchase and Payment services now coordinate to not leave seats hanging if payment fails; seats are momentarily reserved while waiting on payment, then become available if payment fails. 
-
-TODO
+The Event Catalog service now has frequent regex checks to determine if the inputted event, seat, or section ID is a valid UUID-formatted string, each attached to Error 400 messages if the checks fail. The Purchase and Payment services now coordinate to not leave seats hanging if payment fails; seats are momentarily reserved while waiting on payment, then become available if payment fails. Those are the failure scenarios our group specifically planned for, but every worker handles poison pills via dead letter queues when appropriate, and there are many more checks throughout the system validating input variable types, database input format, idempotency, and more.
 
 The analytics worker, the fraud worker, the notification service, and the waitlist worker have DLQ handling. In all tested cases, a poison pill injection moves to the associated dead-letter queue, where it will stay. The notification service has a GET /dlq endpoint to present the current notification DLQ and a POST /dlq/requeue endpoint to retry all of the requests in that DLQ. No other service has structures in place to service a DLQ.
 
@@ -33,6 +29,11 @@ The analytics worker, the fraud worker, the notification service, and the waitli
 | Benson Zheng | event catalog service + database complete       + README update | c4b7a1177219c7099fada09de373912615145e71 |
 |                       |                                                        | 22f74f4cca5e097ac6cf4f11e0b40dfc60a7d9fa |
 | Helektra Katsoulakis  | analytics worker + database complete   + README update | e295a2ee39ef249e841fafdd16d625d8cf6365f4 |
+|                       |                                                        | 280cfb35287f8d46e7b8ba149e4b47355d6a2d53 |
+|                       |                                                        | bb62cceacc8cc2b3fa77e04ad2090333ebb0886d |
+|                       |                                                        | 6bd147d268ec73980c75d564934792ef353afdc2 |
+|                       |                                                        | d50784d665af5fc51ade97a82fab6cfa6b82ff9a |
+|                       |                                                        | c3dfab5662da97ecfb6e81583eca6775e5640f32 |
 | Julia Farber          | payment service + refund compatibility + README update | e2b533b387f55367ffb17dba644912d5c4f096ab |
 |                       |                                                        | b8615fe7728d40b6e8487b2ac40fd35b02a49276 |
 |                       |                                                        | 3b0586fcfd03efcbf6972e9c2a0fe8f1f1b53cf1 |
@@ -61,13 +62,13 @@ The analytics worker, the fraud worker, the notification service, and the waitli
 - [X] Worker `GET /health` shows non-zero `dlq_depth` after poison pills are injected
 - [X] Worker status remains `healthy` while DLQ fills
 - [X] System handles failure scenarios gracefully (no dangling state, no crash loops)
-- [ ] All services/workers required for team size are implemented
-TODO
+- [X] All services/workers required for team size are implemented
+
 ---
 
 ## What Is Not Working / Cut
 
-TODO
+We were not able to plan for a third specific failure scenario before our deadline. While our system is very robust, we did not have a concise enough plan for work to be motivated against any individual component of our system. 
 
 ---
 
@@ -154,4 +155,4 @@ Throughput remained relatively stable throughout the poison pill test. While the
 
 ## Blockers and Lessons Learned
 
-TODO
+We did not communicate clearly enough on what our three failures scenarios were going to be; we merely assigned them to certain members, and they worked out what failure scenarios to choose based on what services they were already working on. Our plan lacked the specificity required to maintain accountability. In the future, we will all agree on the sprint start day not only who is in charge of what responsibility, but also exactly what those responsibilities are. That way, group members can also keep each other accountable by monitoring their progress via repository commits.
