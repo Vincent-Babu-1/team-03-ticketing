@@ -271,7 +271,70 @@ curl -s -X POST http://refund-service:3001/refund-request \
   "failureReason": "idempotency_skip"
 }
 ```
+## Analytics Worker
 
+The Analytics Worker consumes purchase and browse events from the `analytics-queue` Redis queue and writes aggregate stats to the analytics DB. Invalid or malformed events are routed to the `analytics-queue:dlq` dead letter queue.
+
+### GET /health
+Returns 200 if DB and Redis are healthy, 503 if degraded. Also returns queue depth, DLQ depth, and last processed job timestamp.
+```bash
+curl http://analytics-worker:3001/health | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "service": "analytics-worker",
+  "status": "ok",
+  "queueDepth": 0,
+  "dlqDepth": 0,
+  "lastJobAt": "2026-04-27T12:00:00.000Z",
+  "db": "ok",
+  "redis": "ok"
+}
+```
+
+### GET /analytics
+Returns aggregate ticket sales and browse counts for all events from the analytics DB.
+```bash
+curl http://analytics-worker:3001/analytics | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "events": [
+    {
+      "event_id": "cccccccc-0000-0000-0000-000000000001",
+      "tickets_sold": 1,
+      "browse_count": 0,
+      "updated_at": "2026-04-27T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+### Testing
+
+Inject a valid purchase event directly into the queue:
+```bash
+redis-cli -h redis RPUSH analytics-queue '{"event":"ticket_purchased","purchaseId":"aaaaaaaa-0000-0000-0000-000000000001","eventId":"cccccccc-0000-0000-0000-000000000001","quantity":2}'
+```
+
+Then verify it was recorded:
+```bash
+curl http://analytics-worker:3001/analytics | jq .
+```
+
+Inject invalid data to test DLQ:
+```bash
+redis-cli -h redis RPUSH analytics-queue '{"event":"ticket_purchased","purchaseId":"missing-event-id"}'
+```
+
+Verify DLQ depth increased:
+```bash
+curl http://analytics-worker:3001/health | jq '{dlqDepth}'
+```
 
 ---
 
