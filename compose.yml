@@ -237,7 +237,7 @@ services:
   # WAITLIST WORKER:
   waitlist-worker:
     build: ./C-waitlist-worker
-    container_name: waitlist-worker
+    #container_name: waitlist-worker #replicated services can't have custom names
     restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379
@@ -256,7 +256,7 @@ services:
   # FRAUD WORKER
   fraud-worker:
     build: ./C-fraud
-    container_name: fraud-worker
+    # container_name: fraud-worker #replicated services can't have custom names
     restart: unless-stopped
     networks:
       - team-net
@@ -279,7 +279,7 @@ services:
     build:
       context: .
       dockerfile: ./C-analytics/Dockerfile
-    container_name: analytics-worker
+    #container_name: analytics-worker #replicated services can't have custom names
     restart: unless-stopped
     environment:
       - REDIS_URL=redis://redis:6379

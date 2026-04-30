@@ -1,16 +1,22 @@
 // Sprint 4 — 
-//
-// Run from inside the holmes container
-// First test with normal worker counts:
-//   docker compose up --build -d
-//   docker compose exec holmes bash
-//   k6 run /workspace/k6/sprint-4-scale.js
+
+// Open TWO terminals
 
 // First test with normal worker counts:
 //   docker compose down
 //   docker compose up --build --scale analytics-worker=3 -d //!!needs editing in Caddyfile and compose.yml!!
 //   docker compose exec holmes bash
 //   k6 run /workspace/k6/sprint-4-scale.js
+
+// Then, while that is running, in the 2nd terminal run:
+//   docker compose ps analytics-worker -q (to get the container ids of the replicas)
+//   docker stop <one of the container-ids found via previous command>
+//   docker compose ps (to show that this service is unhealthy)
+
+//   docker compose up --scale analytics-worker=3 -d
+//   docker compose ps (to show that this service is healthy)
+
+//   no k6 queries should fail, and nothing extraordinary should happen when the replica rejoins the system.
 
 
 import http from 'k6/http'
@@ -24,7 +30,6 @@ function newUUID(){
 }
 
 const BASE_URL = 'http://analytics-worker:3001/analytics' // remove when Caddy updated
-//const BASE_URL = 'http://analytics-worker-1:3001/analytics' // add when Caddy updated to test only one replica
 //const BASE_URL = 'http://analytics-worker:80/analytics' // add when Caddy updated to INSTEAD test all replicas
 
 const numQueuePushesPerRound = 3
