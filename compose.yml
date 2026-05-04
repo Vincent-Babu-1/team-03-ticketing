@@ -221,7 +221,7 @@ services:
       - PIPELINE=team-03
       - QUEUE_NAME=refundRequests
       - CHECK_PURCHASE_URL=http://purchase-service:3001/purchases/
-      - REVERSE_PAYMENT_URL=http://payment-service:3001/reverse
+      - REVERSE_PAYMENT_URL=http://payment-service:3001/payments/reverse
     depends_on:
       refund-db:
         condition: service_healthy

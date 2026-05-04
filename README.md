@@ -16,7 +16,7 @@
 | -------------------- | ------------------------------------------------------------- |
 | Benson Zheng         | event catalog service                                         |
 | Helektra Katsoulakis | analytics worker + analytics db                               |
-| Julia Farber         | purchase db + payment service + purchase service partially    |
+| Julia Farber         | purchase db + payment service + ticket purchase service       |
 | Katelyn Leung        | events db + notif. service                                    |
 | Maria Mechery        | ticket purchase service + user waitlist worker                |
 | Tien Nguyen          | fraud detection service + worker                              |
@@ -87,7 +87,7 @@ Include which service calls which, what queues exist, and how data flows.]
 
 [Each of us can add to this paragraph with our section of the system.]
 
-Purchases are sent to purchase-request which then reserves a seat, then calls payment service to process payment, and then will confirm the purchase if successful. If the purchase fails, the seat is released back and notifies the waitlist worker. Upon success, the notification system is notified, analytics is notified, fraud is notified so it can gather data to notice patterns. Payment service is called by purchase service. Payment service is also called by refund service to refund a purchase, which validates if it exists and if it is refundable, and updates the seat reservation database and calls waitlist worker that there is avaliable seating, so the waitlist worker can allow waitlisted to make purchases on now availiable tickets.
+Purchases are sent to the Purchase Service, which checks seat availability, reserves them as pending, then synchronously calls the Payment Service. If payment succeeds, the reservation is confirmed and the Purchase Service publishes to confirmed-purchases (consumed by the Notification Service), analytics-queue (consumed by the Analytics Worker), and fraud-queue (consumed by the Fraud Detection Worker). If payment fails, the reservation is released and the seat is pushed to waitlist-queue (consumed by the Waitlist Worker). When a refund occurs, the Payment Service reverses the charge, releases the seat reservation, and pushes to waitlist-queue and publishes to seat-released pub/sub (both consumed by the Waitlist Worker). Purchase DB stores purchases, seat reservations, and payment records, which is owned by Payment Service and Purchase Service.
 
 Refund requests are sent to the Refund service, which checks the Refund database and synchronously calls the Purchase service to determine whether the request is valid. If the request is valid, then the request is noted in the Refund database as successful and the Payment service is contacted to reverse the charge.
 
@@ -120,86 +120,440 @@ Caddy serves both frontends. It rewrites `/` to the customer UI and serves the d
 ---
 
 ## Purchase Service
-
-### GET /health 
-Returns 200 if healthy, 503 if unhealthy/down.
-```bash curl http://purchase-service:3001/health```
-{"service":"purchase","status":"ok","db":"ok","redis":"ok"}
-
+ 
+### GET /health
+ 
+```
+GET /health
+  Returns the health status of this service and its dependencies.
+  Responses:
+    200  Service and all dependencies healthy
+    503  One or more dependencies unreachable
+```
+ 
+Example request:
+ 
+```bash
+curl http://purchase-service:3001/health
+```
+ 
+Example response (200):
+ 
+```json
+{
+  "service": "purchase",
+  "status": "ok",
+  "db": "ok",
+  "redis": "ok"
+}
+```
+ 
+Example response (503):
+ 
+```json
+{
+  "service": "purchase",
+  "status": "degraded",
+  "db": "unavailable",
+  "redis": "ok"
+}
+```
+ 
+---
+ 
 ### POST /purchases
-Creates a new ticket purchase. Reserves a seat, calls payment service, confirms if successful payment or 
-releases the seat if unsuccessful payment. Idempotent on Idempotency-Key header.
+ 
+```
+POST /purchases
+  Creates a new ticket purchase. Reserves the requested seats, calls the
+  Payment Service to process the charge, and confirms or releases based on
+  the result. Idempotent on the Idempotency-Key header.
+  On success, publishes to:
+    confirmed-purchases  (Notification Worker)
+    analytics-queue      (Analytics Worker)
+    fraud-queue          (Fraud Worker)
+  On failure or Payment Service unreachable, pushes to:
+    waitlist-queue       (Waitlist Worker)
+  Header parameters:
+    Idempotency-Key [UUID, required]  Unique key to prevent duplicate purchases.
+  Body parameters:
+    userId    [UUID, required]          The purchasing user.
+    eventId   [UUID, required]          The event to purchase tickets for.
+    cardToken [string, required]        Payment card token.
+    seats     [string array, required]  Seat labels to purchase (e.g. ["A1", "A2"]).
+  Responses:
+    200  Purchase confirmed (or duplicate request returning original result).
+    400  Missing fields, invalid format, or seat(s) already taken.
+    402  Payment declined — purchase recorded as failed, seats released.
+    503  Payment Service unreachable — seats released.
+```
+ 
+Example request:
+ 
+```bash
 curl -X POST http://purchase-service:3001/purchases \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: aaaaaaaa-0000-0000-0000-000000000001" \
-  -d '{"userId": "bbbbbbbb-0000-0000-0000-000000000001", "eventId": "cccccccc-0000-0000-0000-000000000001", "cardToken": "test-card", "seats": ["A1", "A2"]}' | jq .
+  -d '{
+    "userId": "bbbbbbbb-0000-0000-0000-000000000001",
+    "eventId": "cccccccc-0000-0000-0000-000000000001",
+    "cardToken": "test-card",
+    "seats": ["A1", "A2"]
+  }' | jq .
+```
+ 
+Example response (200):
+ 
+```json
 {
   "purchaseId": "d0f2426b-20c7-4fbf-90cb-743d0ae00a5e",
   "userId": "bbbbbbbb-0000-0000-0000-000000000001",
   "eventId": "cccccccc-0000-0000-0000-000000000001",
-  "seats": [
-    "A1",
-    "A2"
-  ],
+  "seats": ["A1", "A2"],
   "quantity": 2,
-  "totalUsd": 446,
+  "totalUsd": 446.00,
   "status": "confirmed",
   "createdAt": "2026-04-26T22:39:18.092Z"
 }
-
-### GET /purchases/:id
-Looks up and returns a single purchase by its id (purchase id)
-curl http://purchase-service:3001/purchases/d0f2426b-20c7-4fbf-90cb-743d0ae00a5e
-{"error":"Purchase not found"} if not found.
-{"id":"d0f2426b-20c7-4fbf-90cb-743d0ae00a5e","idempotency_key":"aaaaaaaa-0000-0000-0000-000000000001","user_id":"bbbbbbbb-0000-0000-0000-000000000001","event_id":"cccccccc-0000-0000-0000-000000000001","seats":["A1","A2"],"quantity":2,"total_usd":"446.00","card_token":"test-card","status":"confirmed","created_at":"2026-04-26T22:39:18.087Z"} if found.
-
-### GET /reservations/:id
-Looks up and returns a single reservation by its id (reservation id, but id in the reservations table)
-curl http://purchase-service:3001/reservations/aaaaaaaa-0000-0000-0000-000000000001
-{"error":"Reservation not found"} or 
+```
+ 
+Example response (400):
+ 
+```json
 {
-  "id": "uuid",
-  "purchase_id": "uuid",
-  "event_id": "uuid",
+  "error": "Missing required fields or seats invalid, bad format or length"
+}
+```
+ 
+Example response (400 — seats already taken):
+ 
+```json
+{
+  "error": "purchase aaaaaaaa-0000-0000-0000-000000000001: seat(s) already taken."
+}
+```
+ 
+Example response (402):
+ 
+```json
+{
+  "purchaseId": "d0f2426b-20c7-4fbf-90cb-743d0ae00a5e",
+  "userId": "bbbbbbbb-0000-0000-0000-000000000001",
+  "eventId": "cccccccc-0000-0000-0000-000000000001",
+  "seats": ["A1", "A2"],
+  "quantity": 2,
+  "totalUsd": 446.00,
+  "status": "failed",
+  "createdAt": "2026-04-26T22:39:18.092Z"
+}
+```
+ 
+Example response (503):
+ 
+```json
+{
+  "error": "Payment Service unavailable"
+}
+```
+ 
+---
+ 
+### GET /purchases/:id
+ 
+```
+GET /purchases/:id
+  Looks up and returns a single purchase by its purchase ID.
+  Path parameters:
+    id [UUID, required]  The purchase ID to look up.
+  Responses:
+    200  Purchase found and returned.
+    404  Purchase not found.
+```
+ 
+Example request:
+ 
+```bash
+curl http://purchase-service:3001/purchases/d0f2426b-20c7-4fbf-90cb-743d0ae00a5e | jq .
+```
+ 
+Example response (200):
+ 
+```json
+{
+  "id": "d0f2426b-20c7-4fbf-90cb-743d0ae00a5e",
+  "idempotency_key": "aaaaaaaa-0000-0000-0000-000000000001",
+  "user_id": "bbbbbbbb-0000-0000-0000-000000000001",
+  "event_id": "cccccccc-0000-0000-0000-000000000001",
+  "seats": ["A1", "A2"],
+  "quantity": 2,
+  "total_usd": "446.00",
+  "card_token": "test-card",
+  "status": "confirmed",
+  "created_at": "2026-04-26T22:39:18.087Z"
+}
+```
+ 
+Example response (404):
+ 
+```json
+{
+  "error": "Purchase not found"
+}
+```
+ 
+---
+ 
+### GET /reservations/:id
+ 
+```
+GET /reservations/:id
+  Looks up and returns a single seat reservation by its reservation ID.
+  Path parameters:
+    id [UUID, required]  The reservation ID to look up.
+  Responses:
+    200  Reservation found and returned.
+    404  Reservation not found.
+```
+ 
+Example request:
+ 
+```bash
+curl http://purchase-service:3001/reservations/e1a2b3c4-0000-0000-0000-000000000001 | jq .
+```
+ 
+Example response (200):
+ 
+```json
+{
+  "id": "e1a2b3c4-0000-0000-0000-000000000001",
+  "purchase_id": "d0f2426b-20c7-4fbf-90cb-743d0ae00a5e",
+  "event_id": "cccccccc-0000-0000-0000-000000000001",
   "seats": ["A1", "A2"],
   "quantity": 2,
   "status": "confirmed",
   "created_at": "2026-04-26T21:46:00.139Z",
   "updated_at": "2026-04-26T21:46:00.139Z"
 }
-
+```
+ 
+Example response (404):
+ 
+```json
+{
+  "error": "Reservation not found"
+}
+```
+ 
 ---
-
+ 
 ## Payment Service
-
-### GET /health 
+ 
+### GET /health
+ 
+```
+GET /health
+  Returns the health status of this service and its dependencies.
+  Responses:
+    200  Service and all dependencies healthy
+    503  One or more dependencies unreachable
+```
+ 
+Example request:
+ 
+```bash
 curl http://payment-service:3001/health
-{"service":"payment-service","status":"ok","db":"ok","redis":"ok"}
-Returns 200 if healthy, 503 if unhealthy/down.
-
+```
+ 
+Example response (200):
+ 
+```json
+{
+  "service": "payment-service",
+  "status": "ok",
+  "db": "ok",
+  "redis": "ok"
+}
+```
+ 
+Example response (503):
+ 
+```json
+{
+  "service": "payment-service",
+  "status": "degraded",
+  "db": "unavailable",
+  "redis": "ok"
+}
+```
+ 
+---
+ 
 ### POST /payments
-Called by purchase-service only to trigger a payment. Processes a simulated (I/O simulation) payment for a purchase. 
-Idempotent on purchase_id, preventing duplicate charging.
+ 
+```
+POST /payments
+  Called by Purchase Service only. Processes a simulated payment for a
+  purchase. Idempotent on purchase_id — will not double-charge.
+  Body parameters:
+    purchase_id [UUID, required]    The purchase this payment is for.
+    amount      [number, required]  Amount in USD to charge (must be > 0).
+    cardToken   [string, required]  Payment card token.
+  Responses:
+    200  Payment succeeded.
+    400  Missing or invalid fields.
+    402  Payment declined.
+```
+ 
+Example request:
+ 
+```bash
 curl -X POST http://payment-service:3001/payments \
   -H "Content-Type: application/json" \
-  -d '{"purchase_id": "aaaaaaaa-0000-0000-0000-000000000001", "amount": 204.00, "cardToken": "test-card"}'
-{"payment_id":"cc34f7bc-9033-44e7-b5d4-423e65b08732","purchase_id":"aaaaaaaa-0000-0000-0000-000000000001","status":"success","amount":"204.00"}
-
+  -d '{
+    "purchase_id": "aaaaaaaa-0000-0000-0000-000000000001",
+    "amount": 204.00,
+    "cardToken": "test-card"
+  }' | jq .
+```
+ 
+Example response (200):
+ 
+```json
+{
+  "payment_id": "cc34f7bc-9033-44e7-b5d4-423e65b08732",
+  "purchase_id": "aaaaaaaa-0000-0000-0000-000000000001",
+  "status": "success",
+  "amount": "204.00"
+}
+```
+ 
+Example response (400):
+ 
+```json
+{
+  "error": "Missing required fields: purchase_id, amount, cardToken"
+}
+```
+ 
+Example response (402):
+ 
+```json
+{
+  "payment_id": "cc34f7bc-9033-44e7-b5d4-423e65b08732",
+  "purchase_id": "aaaaaaaa-0000-0000-0000-000000000001",
+  "status": "failed",
+  "amount": 0
+}
+```
+ 
+---
+ 
 ### GET /payments/:purchase_id
-Look up and return a payment record by its purchase_id.
-curl http://payment-service:3001/payments/aaaaaaaa-0000-0000-0000-000000000001
-{"id":"cc34f7bc-9033-44e7-b5d4-423e65b08732","purchase_id":"aaaaaaaa-0000-0000-0000-000000000001",
-"refund_id":null,"total_usd":"204.00","status":"succeeded","created_at":"2026-04-26T22:45:52.305Z",
-"updated_at":"2026-04-26T22:45:52.305Z"}
-
+ 
+```
+GET /payments/:purchase_id
+  Looks up and returns a payment record by its purchase_id.
+  Path parameters:
+    purchase_id [UUID, required]  The purchase ID to look up the payment for.
+  Responses:
+    200  Payment found and returned.
+    404  No payment found for the given purchase_id.
+```
+ 
+Example request:
+ 
+```bash
+curl http://payment-service:3001/payments/aaaaaaaa-0000-0000-0000-000000000001 | jq .
+```
+ 
+Example response (200):
+ 
+```json
+{
+  "id": "cc34f7bc-9033-44e7-b5d4-423e65b08732",
+  "purchase_id": "aaaaaaaa-0000-0000-0000-000000000001",
+  "refund_id": null,
+  "total_usd": "204.00",
+  "status": "succeeded",
+  "created_at": "2026-04-26T22:45:52.305Z",
+  "updated_at": "2026-04-26T22:45:52.305Z"
+}
+```
+ 
+Example response (404):
+ 
+```json
+{
+  "error": "Payment with purchase_id aaaaaaaa-0000-0000-0000-000000000001 not found."
+}
+```
+ 
+---
+ 
 ### POST /payments/reverse
-Reverses a payment (refunds). Called by refund service only to trigger payment-service to refund. Idempotent on purchase_id,
-and ensures that there exists a successful payment so no fraud occurs.
+ 
+```
+POST /payments/reverse
+  Called by Refund Service only. Reverses a succeeded payment. Idempotent
+  on purchase_id. On success, releases the associated reservation and
+  publishes to:
+    seat-released   (pub/sub)
+    waitlist-queue  (Waitlist Worker)
+  Body parameters:
+    purchase_id [UUID, required]  The purchase to refund.
+    refund_id   [UUID, required]  Unique refund identifier for idempotency.
+  Responses:
+    200  Payment reversed successfully (or was already refunded).
+    400  Missing fields, or payment status is failed — nothing to refund.
+    404  No payment found for the given purchase_id.
+```
+ 
+Example request:
+ 
+```bash
 curl -X POST http://payment-service:3001/payments/reverse \
   -H "Content-Type: application/json" \
-  -d '{"purchase_id": "aaaaaaaa-0000-0000-0000-000000000001", "refund_id": "dddddddd-0000-0000-0000-000000000001"}'
-{"payment_id":"cc34f7bc-9033-44e7-b5d4-423e65b08732","refund_id":"dddddddd-0000-0000-0000-000000000001",
-"purchase_id":"aaaaaaaa-0000-0000-0000-000000000001","status":"refunded","total_usd":"204.00"}
+  -d '{
+    "purchase_id": "aaaaaaaa-0000-0000-0000-000000000001",
+    "refund_id": "dddddddd-0000-0000-0000-000000000001"
+  }' | jq .
+```
+ 
+Example response (200):
+ 
+```json
+{
+  "payment_id": "cc34f7bc-9033-44e7-b5d4-423e65b08732",
+  "purchase_id": "aaaaaaaa-0000-0000-0000-000000000001",
+  "refund_id": "dddddddd-0000-0000-0000-000000000001",
+  "status": "refunded",
+  "total_usd": "204.00"
+}
+```
+ 
+Example response (400 — missing fields):
+ 
+```json
+{
+  "error": "Missing purchase_id to refund."
+}
+```
+ 
+Example response (400 — payment failed, nothing to refund):
+ 
+```json
+{
+  "error": "Payment failed, nothing to refund for purchase: aaaaaaaa-0000-0000-0000-000000000001"
+}
+```
+ 
+Example response (404):
+ 
+```json
+{
+  "error": "No payment found of purchase id: aaaaaaaa-0000-0000-0000-000000000001"
+}
+```
 ---
 
 ## Refund Service
@@ -439,6 +793,7 @@ curl http://analytics-worker:3001/analytics | jq .
   ]
 }
 ```
+
 ### Testing
 
 Inject a valid purchase event directly into the queue:
