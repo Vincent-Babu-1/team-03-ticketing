@@ -4,16 +4,19 @@
 
 // First test with normal worker counts:
 //   docker compose down
-//   docker compose up --build --scale analytics-worker=3 -d //!!needs editing in Caddyfile and compose.yml!!
+//   docker compose up --scale analytics-worker=3  --build -d
 //   docker compose exec holmes bash
-//   k6 run /workspace/k6/sprint-4-scale.js
+//   k6 run /workspace/k6/sprint-4-test.js
 
 // Then, while that is running, in the 2nd terminal run:
 //   docker compose ps analytics-worker -q (to get the container ids of the replicas)
-//   docker stop <one of the container-ids found via previous command>
+// 029b2a2629ce8145f05462ce90a710419e60c1380d16cfefa3952d61b608a172
+// eea38b9e6b164d10b298fa450949976b0b239a27f330b27d7275f1fd4aa20fc8
+// 91894f7daf265202aaafc54f15fe972341dc4d37d55fcd5769401c8a5f0f9367
+//   docker stop eea38b9e6b164d10b298fa450949976b0b239a27f330b27d7275f1fd4aa20fc8
 //   docker compose ps (to show that this service is unhealthy)
 
-//   docker compose up --scale analytics-worker=3 -d
+//   docker compose up --scale analytics-worker=3 --scale fraud-worker=3 --scale waitlist-worker=3 -d
 //   docker compose ps (to show that this service is healthy)
 
 //   no k6 queries should fail, and nothing extraordinary should happen when the replica rejoins the system.
@@ -29,8 +32,7 @@ function newUUID(){
   return uuidv4();
 }
 
-const BASE_URL = 'http://analytics-worker:3001/analytics' // remove when Caddy updated
-//const BASE_URL = 'http://analytics-worker:80/analytics' // add when Caddy updated to INSTEAD test all replicas
+const BASE_URL = 'http://analytics-worker:3001/analytics' 
 
 const numQueuePushesPerRound = 3
 

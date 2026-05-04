@@ -989,7 +989,7 @@ curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID | jq .
 ### POST /events/:eventId/populate
 Populates an existing event with sections and seats. Creates one section for each name in `sectionNames` and creates `capacity` seats for each section.
 ```bash
-curl -X POST http://event-catalog-service:3006/events/EVENT_ID/populate \
+curl -X POST http://event-cat-service:3001/events/EVENT_ID/populate \
   -H "Content-Type: application/json" \
   -d '{
     "basePrice": 100,
