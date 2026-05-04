@@ -52,9 +52,14 @@
             </select>
           </label>
 
+          <div>
+            <label for="seat-picker" class="seat-picker-label">Seats</label>
+            <div id="seat-picker" class="seat-picker hidden" aria-live="polite"></div>
+          </div>
+
           <label>
             Ticket quantity
-            <input id="quantity" name="quantity" type="number" min="1" max="8" value="1" required>
+            <input id="quantity" name="quantity" type="number" min="0" max="8" value="0" required readonly>
           </label>
 
           <label>
