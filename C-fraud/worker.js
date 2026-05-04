@@ -33,7 +33,7 @@ function suspicious_activity(event) {
   const tokenCount = (paymentTokenMap.get(paymentToken) || 0) + 1;
   paymentTokenMap.set(paymentToken, tokenCount);
 
-  if (tokenCount > 3) return "payment_token_reuse";
+  if (tokenCount > 1) return "payment_token_reuse";
 
   // Rule 2: rapid purchases
   const now = Date.now();

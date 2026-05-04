@@ -13,6 +13,10 @@ curl -X POST http://purchase-service:3001/purchases \
 
 // above should reject as A1 is already taken.^
 
+To view the Db, do this, also can do more specific ones or view payment status.
+psql postgres://user:pass@purchase-db:5432/purchasedb \
+  -c "SELECT * FROM reservations;"
+
 
 Refunding below:
 // should exist 

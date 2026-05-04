@@ -30,6 +30,12 @@ app.get("/", (req, res) => {
 app.post("/events/:eventId/populate", async (req, res) => {
   const { eventId } = req.params;
   const { basePrice, capacity, sectionNames } = req.body;
+  
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
 
   const createdSections = [];
 
@@ -130,6 +136,12 @@ app.post("/events/:eventId/populate", async (req, res) => {
 app.get("/events/:eventId/seats", async (req, res) => {
   const { eventId } = req.params;
 
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
   try {
     const result = await pool.query(
       `
@@ -152,6 +164,18 @@ app.get("/events/:eventId/seats", async (req, res) => {
 app.get("/events/:eventId/sections/:sectionId/seats", async (req, res) => {
   const { eventId, sectionId } = req.params;
 
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
+  if (!isValidUUID(sectionId)) {
+    return res.status(400).json({
+      error: "Invalid section ID format"
+    });
+  }
+
   try {
     const result = await pool.query(
       `
@@ -173,6 +197,24 @@ app.get("/events/:eventId/sections/:sectionId/seats", async (req, res) => {
 
 app.get("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res) => {
   const { eventId, sectionId, seatId } = req.params;
+
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
+  if (!isValidUUID(sectionId)) {
+    return res.status(400).json({
+      error: "Invalid section ID format"
+    });
+  }
+
+  if (!isValidUUID(seatId)) {
+    return res.status(400).json({
+      error: "Invalid seat ID format"
+    });
+  }
 
   try {
     const result = await pool.query(
@@ -199,6 +241,18 @@ app.get("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res) =
 app.post("/events/:eventId/sections/:sectionId/seats", async (req, res) => {
   const { eventId, sectionId } = req.params;
   const { row, seat_number, status = "available" } = req.body ?? {};
+
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
+  if (!isValidUUID(sectionId)) {
+    return res.status(400).json({
+      error: "Invalid section ID format"
+    });
+  }
 
   try {
     if (!row || seat_number == null) {
@@ -249,7 +303,25 @@ app.post("/events/:eventId/sections/:sectionId/seats", async (req, res) => {
 
 app.put("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res) => {
   const { eventId, sectionId, seatId } = req.params;
-  const { row, seat_number, status } = req.body ?? {};
+  const { row, seat_number, status } = req.body;
+
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
+  if (!isValidUUID(sectionId)) {
+    return res.status(400).json({
+      error: "Invalid section ID format"
+    });
+  }
+
+  if (!isValidUUID(seatId)) {
+    return res.status(400).json({
+      error: "Invalid seat ID format"
+    });
+  }
 
   try {
     const existingResult = await pool.query(
@@ -301,6 +373,24 @@ app.put("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res) =
 app.delete("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res) => {
   const { eventId, sectionId, seatId } = req.params;
 
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
+  if (!isValidUUID(sectionId)) {
+    return res.status(400).json({
+      error: "Invalid secion ID format"
+    });
+  }
+
+  if (!isValidUUID(seatId)) {
+    return res.status(400).json({
+      error: "Invalid seat ID format"
+    });
+  }
+
   try {
     const existingResult = await pool.query(
       `
@@ -339,6 +429,12 @@ app.delete("/events/:eventId/sections/:sectionId/seats/:seatId", async (req, res
 app.get("/events/:eventId/sections", async (req, res) => {
   const { eventId } = req.params;
 
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
   try {
     const result = await pool.query(
       `
@@ -363,6 +459,18 @@ app.get("/events/:eventId/sections", async (req, res) => {
 
 app.get("/events/:eventId/sections/:sectionId", async (req, res) => {
   const { eventId, sectionId } = req.params;
+
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
+  if (!isValidUUID(sectionId)) {
+    return res.status(400).json({
+      error: "Invalid secion ID format"
+    });
+  }
 
   try {
     const result = await pool.query(
@@ -391,7 +499,13 @@ app.get("/events/:eventId/sections/:sectionId", async (req, res) => {
 
 app.post("/events/:eventId/sections", async (req, res) => {
   const { eventId } = req.params;
-  const { section_name, price, capacity } = req.body ?? {};
+  const { section_name, price, capacity } = req.body;
+
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
 
   try {
     if (!section_name || price == null) {
@@ -436,7 +550,19 @@ app.post("/events/:eventId/sections", async (req, res) => {
 
 app.put("/events/:eventId/sections/:sectionId", async (req, res) => {
   const { eventId, sectionId } = req.params;
-  const { section_name, price, capacity } = req.body ?? {};
+  const { section_name, price, capacity } = req.body;
+
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
+  if (!isValidUUID(sectionId)) {
+    return res.status(400).json({
+      error: "Invalid section ID format"
+    });
+  }
 
   try {
     const existingResult = await pool.query(
@@ -481,6 +607,18 @@ app.put("/events/:eventId/sections/:sectionId", async (req, res) => {
 app.delete("/events/:eventId/sections/:sectionId", async (req, res) => {
   const { eventId, sectionId } = req.params;
 
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
+  if (!isValidUUID(sectionId)) {
+    return res.status(400).json({
+      error: "Invalid section ID format"
+    });
+  }
+
   try {
     const result = await pool.query(
       `
@@ -509,6 +647,12 @@ app.delete("/events/:eventId/sections/:sectionId", async (req, res) => {
 app.get("/events/:eventId", async (req, res) => {
   const { eventId } = req.params;
   const EVENT_KEY = `events:${eventId}`;
+
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
 
   try {
     const cached = await redis.get(EVENT_KEY);
@@ -616,6 +760,12 @@ app.delete("/events/:eventId", async (req, res) => {
   const { eventId } = req.params;
   const EVENT_KEY = `events:${eventId}`;
 
+  if (!isValidUUID(eventId)) {
+    return res.status(400).json({
+      error: "Invalid event ID format"
+    });
+  }
+
   try {
     const result = await pool.query(
       `
@@ -685,3 +835,7 @@ app.get("/health", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+const isValidUUID = (id) => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};

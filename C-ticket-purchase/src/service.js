@@ -60,6 +60,10 @@ async function syncSeatStatuses(eventId, seatLabels, newStatus) {
   }
 }
 
+const isValidUUID = (id) => {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+};
+
 // http://localhost:3002/ -- Checking that its up on port 3002.
 app.get("/", (req, res) => {
   res.send("Hello World FROM purchase-service");
@@ -109,6 +113,9 @@ app.post('/purchases', async (req, res) => {
   const idempotencyKey = req.headers['idempotency-key'];
   if (!idempotencyKey) {
     return res.status(400).json({ error: 'Idempotency-Key header is required' });
+  }
+  if (!isValidUUID(idempotencyKey)){
+    return res.status(400).json({ error: 'Idempotency-Key header is wrong format (expected UUID)' });
   }
 
   // Gets the fields from the request body & checks if anything missing

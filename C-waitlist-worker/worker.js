@@ -121,7 +121,7 @@ app.listen(PORT, () => {
 async function startWorker() {
   while (true) {
     try {
-      const result = await redis.blPop(QUEUE, 5);
+      const result = await redis.blPop(QUEUE, 1);
       if (result) {
         await processEntry(result.element);
       }
