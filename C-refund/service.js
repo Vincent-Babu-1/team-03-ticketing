@@ -240,5 +240,5 @@ curl -s -X POST http://payment-service:3001/payments \
 curl -s -X POST http://purchase-service:3001/purchases \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: aaaaaaaa-0000-0000-0000-000000000001" \
-  -d '{"userId": "bbbbbbbb-0000-0000-0000-000000000001", "eventId": "cccccccc-0000-0000-0000-000000000001", "cardToken": "test-card", "seats": ["A1", "A2"]}' | jq .
+  -d '{"userId": "bbbbbbbb-0000-0000-0000-000000000001", "eventId": "cccccccc-0000-0000-0000-000000000001", "cardToken": "test-card", "seats": ["A-1"]}' | jq .
 */
