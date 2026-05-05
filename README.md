@@ -84,7 +84,7 @@ holmes                 (no port — access via exec)
 
 The Event-Catalog Service provides the frontend with event and seat information before a purchase happens. It manages events, venues, dates, sections, and seats, and owns the events database. The frontend calls it to list events, view event details, show sections, prices, capacity, and available seats. It also caches common reads in Redis using keys like `events:all` and `events:{eventId}`. 
 
-Purchases are sent to the Purchase Service, which checks seat availability, reserves them as pending, then synchronously calls the Payment Service. If payment succeeds, the reservation is confirmed and the Purchase Service publishes to confirmed-purchases (consumed by the Notification Service), analytics-queue (consumed by the Analytics Worker), and fraud-queue (consumed by the Fraud Detection Worker). If payment fails, the reservation is released and the seat is pushed to waitlist-queue (consumed by the Waitlist Worker). When a refund occurs, the Payment Service reverses the charge, releases the seat reservation, and pushes to waitlist-queue and publishes to seat-released pub/sub (both consumed by the Waitlist Worker). Purchase DB stores purchases, seat reservations, and payment records, which is owned by Payment Service and Purchase Service.
+Purchases are sent to the Purchase Service, which checks seat availability, reserves them as pending, then synchronously calls the Payment Service. If payment succeeds, the reservation is confirmed and the Purchase Service publishes to confirmed-purchases (consumed by the Notification Service), analytics-queue (consumed by the Analytics Worker), and purchase-events (consumed by the Fraud Detection Worker). If payment fails, the reservation is released and the seat is pushed to waitlist-queue (consumed by the Waitlist Worker). When a refund occurs, the Payment Service reverses the charge, releases the seat reservation, and pushes to waitlist-queue and publishes to seat-released pub/sub (both consumed by the Waitlist Worker). Purchase DB stores purchases, seat reservations, and payment records, which is owned by Payment Service and Purchase Service.
 
 Refund requests are sent to the Refund service, which checks the Refund database and synchronously calls the Purchase service to determine whether the request is valid. If the request is valid, then the request is noted in the Refund database as successful and the Payment service is contacted to reverse the charge.
 
@@ -172,7 +172,7 @@ POST /purchases
   On success, publishes to:
     confirmed-purchases  (Notification Worker)
     analytics-queue      (Analytics Worker)
-    fraud-queue          (Fraud Worker)
+    purchase-events          (Fraud Worker)
   On failure or Payment Service unreachable, pushes to:
     waitlist-queue       (Waitlist Worker)
   Header parameters:
