@@ -86,6 +86,8 @@ holmes                 (no port — access via exec)
 Include which service calls which, what queues exist, and how data flows.]
 
 [Each of us can add to this paragraph with our section of the system.]
+The Event Catalog Service provides the frontend with event and seat information before a purchase happens. It manages events, venues, dates, sections, and seats, and owns the events database. The frontend calls it to list events, view event details, show sections, prices, capacity, and available seats. It also caches common reads in Redis using keys like `events:all` and `events:{eventId}`. 
+
 
 Purchases are sent to the Purchase Service, which checks seat availability, reserves them as pending, then synchronously calls the Payment Service. If payment succeeds, the reservation is confirmed and the Purchase Service publishes to confirmed-purchases (consumed by the Notification Service), analytics-queue (consumed by the Analytics Worker), and fraud-queue (consumed by the Fraud Detection Worker). If payment fails, the reservation is released and the seat is pushed to waitlist-queue (consumed by the Waitlist Worker). When a refund occurs, the Payment Service reverses the charge, releases the seat reservation, and pushes to waitlist-queue and publishes to seat-released pub/sub (both consumed by the Waitlist Worker). Purchase DB stores purchases, seat reservations, and payment records, which is owned by Payment Service and Purchase Service.
 
