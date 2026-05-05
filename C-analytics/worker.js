@@ -66,6 +66,7 @@ app.get('/health', async (req, res) => {
  
 // GET /analytics
 app.get('/analytics', async (req, res) => {
+  console.log('[analytics-worker] GET /analytics hit');
   try {
     const { rows } = await db.query(
       'SELECT event_id, tickets_sold, browse_count, updated_at FROM event_stats ORDER BY updated_at DESC'

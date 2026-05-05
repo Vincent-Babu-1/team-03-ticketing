@@ -26,16 +26,15 @@
         reverse_proxy analytics-worker:3001
     }
 
-    reverse_proxy analytics-worker:3001 {
-        lb_policy round_robin
-    }
-
-    reverse_proxy fraud-worker:3001 {
-        lb_policy round_robin
-    }
-
-    reverse_proxy waitlist-worker:3001 {
-        lb_policy round_robin
+    handle /api/analytics* {
+        uri strip_prefix /api
+        reverse_proxy {
+            dynamic a {
+                name analytics-worker
+                port 3001
+            }
+            lb_policy round_robin
+        }
     }
 
     handle /api/system/fraud/health {
