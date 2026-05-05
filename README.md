@@ -91,6 +91,8 @@ Purchases are sent to the Purchase Service, which checks seat availability, rese
 
 Refund requests are sent to the Refund service, which checks the Refund database and synchronously calls the Purchase service to determine whether the request is valid. If the request is valid, then the request is noted in the Refund database as successful and the Payment service is contacted to reverse the charge.
 
+When a ticket is cancelled or a payment fails, the Refund Service publishes a seat-released event using Redis pub/sub. The Waitlist Worker picks this up and temporarily locks the process so only one worker handles it, preventing duplicate processing when multiple workers are running. It then takes the next person on the waitlist and confirms their spot by sending a message to the confirmed purchases channel. Bad entries are moved to the dead letter queue instead of retrying forever.
+
 ## Frontend Overview
 
 The repository now includes two static frontend surfaces under `ui/`:
@@ -1365,6 +1367,74 @@ curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID/sections/SECTIO
   "error": "Seat not found"
 }
 ```
+
+---
+## Waitlist Worker
+
+### GET /health
+```
+GET /health
+  Returns the health status of this worker and its dependencies.
+  Responses:
+    200  Worker and all dependencies healthy
+    503  One or more dependencies unreachable
+```
+
+**Example request:**
+
+```bash
+curl http://waitlist-worker:3000/health | jq .
+```
+
+**Example response (200):**
+
+```json
+{
+  "status": "healthy",
+  "redis": "ok",
+  "queue": {
+    "status": "healthy",
+    "depth": 0,
+    "dlq_depth": 0
+  },
+  "last_job_at": "2026-04-28T10:23:11.000Z",
+  "jobs_processed": 5
+}
+```
+
+**Example response (503):**
+
+```json
+{
+  "status": "unhealthy",
+  "redis": "unavailable",
+  "error": "Redis timeout"
+}
+```
+
+### Testing
+
+Inject a valid seat-released event to test waitlist promotion:
+```bash
+redis-cli -h redis RPUSH waitlist-queue '{"userId":"88888888-8888-8888-8888-888888888888","eventId":"00000000-0000-0000-0000-000000000001"}'
+```
+
+Then verify it was processed 
+```bash
+curl http://waitlist-worker:3000/health | jq .
+```
+
+Inject invalid data to test DLQ:
+```bash
+redis-cli -h redis RPUSH waitlist-queue '{"broken_field": null}'
+```
+
+Verify DLQ depth increased:
+```bash
+redis-cli -h redis LLEN waitlist-queue:dlq
+```
+
+---
 
 ## Sprint History
 

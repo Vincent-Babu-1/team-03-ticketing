@@ -99,13 +99,17 @@ const app = express();
 
 app.get('/health', async (req, res) => {
   try {
-    await redis.ping();
+    await Promise.race([
+      redis.ping(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 2000))
+    ]);
 
     const depth = await redis.lLen(QUEUE);
     const dlqDepth = await redis.lLen(DLQ);
 
     res.status(200).json({
-      status: 'ok',
+      status: 'healthy',
+      redis: 'ok',
       queue: {
         status: dlqDepth > 0 ? 'degraded' : 'healthy',
         depth: depth,
@@ -116,7 +120,7 @@ app.get('/health', async (req, res) => {
     });
   } catch (err) {
     res.status(503).json({
-      status: 'error',
+      status: 'unhealthy',
       redis: 'unavailable',
       error: err.message,
     });
