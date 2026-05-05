@@ -1431,8 +1431,10 @@ redis-cli -h redis RPUSH waitlist-queue '{"broken_field": null}'
 
 Verify DLQ depth increased:
 ```bash
-curl http://waitlist-worker:3000/health | jq '.queue.dlq_depth'
+redis-cli -h redis LLEN waitlist-queue:dlq
 ```
+
+---
 
 ## Sprint History
 
