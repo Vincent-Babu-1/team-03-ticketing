@@ -207,7 +207,7 @@ app.post('/purchases', async (req, res) => {
  
     await redis.publish('confirmed-purchases', JSON.stringify({ purchaseId, userId, eventId, seats }));
     await redis.rPush('analytics-queue', JSON.stringify({ event: 'ticket_purchased', purchaseId, eventId, quantity }));
-    await redis.rPush('fraud-queue', JSON.stringify({ purchaseId, userId, eventId, paymentToken: cardToken }));
+    await redis.rPush('purchase-events', JSON.stringify({ purchaseId, userId, eventId, paymentToken: cardToken }));
     console.log(`purchase ${idempotencyKey} confirmed!`);
     return res.status(200).json({
       purchaseId,
