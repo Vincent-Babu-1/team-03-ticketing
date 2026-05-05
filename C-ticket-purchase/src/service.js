@@ -179,7 +179,7 @@ app.post('/purchases', async (req, res) => {
       `UPDATE reservations SET status = 'released', updated_at = NOW() WHERE id = $1`,
       [reservationId]
     );
-    await redis.rPush('waitlist-queue', JSON.stringify({ eventId, seats }));
+    await redis.rPush('waitlist-queue', JSON.stringify({ eventId, seats, userId }));
     console.log(`purchase ${idempotencyKey}: payment service unavailable, seats released`);
     return res.status(503).json({ error: 'Payment Service unavailable' });
   }
@@ -207,7 +207,7 @@ app.post('/purchases', async (req, res) => {
  
     await redis.publish('confirmed-purchases', JSON.stringify({ purchaseId, userId, eventId, seats }));
     await redis.rPush('analytics-queue', JSON.stringify({ event: 'ticket_purchased', purchaseId, eventId, quantity }));
-    await redis.rPush('fraud-queue', JSON.stringify({ purchaseId, userId, eventId, cardToken }));
+    await redis.rPush('fraud-queue', JSON.stringify({ purchaseId, userId, eventId, paymentToken: cardToken }));
     console.log(`purchase ${idempotencyKey} confirmed!`);
     return res.status(200).json({
       purchaseId,
@@ -234,7 +234,7 @@ app.post('/purchases', async (req, res) => {
     }
 
     // Push released seats to waitlist so Waitlist Worker can promote next user
-    await redis.rPush('waitlist-queue', JSON.stringify({ eventId, seats }));
+    await redis.rPush('waitlist-queue', JSON.stringify({ eventId, seats, userId }));
  
     // Save failed purchase
     await pool.query(
