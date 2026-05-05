@@ -27,8 +27,16 @@ await subscriber.connect();
 console.log('waitlist-worker connected to Redis');
 
 // Refund Service publishes to seat-released, then push to waitlist-queue
-await subscriber.subscribe(SEAT_RELEASED_CHANNEL, (message) => {
-  console.log('Seat released event received - pushing to waitlist-queue:', message);
+await subscriber.subscribe(SEAT_RELEASED_CHANNEL, async (message) => {
+  console.log('Seat released event received', message);
+  //Created lock so all 3 replicas don't push same message into queue 3x
+  const lockKey = `lock:seat-released:${message}`;
+  const result = await redis.set(lockKey, '1', { NX: true, EX: 3 });
+  if (result !== 'OK') {
+    console.log('Another replica already handled this event, skipping');
+    return;
+  }
+  console.log('Lock acquired, pushing to waitlist-queue');
   redis.rPush(QUEUE, message).catch((err) => {
     console.error('Failed to push seat-released message to waitlist-queue:', err.message);
   });
@@ -98,9 +106,11 @@ app.get('/health', async (req, res) => {
 
     res.status(200).json({
       status: 'ok',
-      redis: 'ok',
-      depth: depth,
-      dlq_depth: dlqDepth,
+      queue: {
+        status: dlqDepth > 0 ? 'degraded' : 'healthy',
+        depth: depth,
+        dlq_depth: dlqDepth,
+      },
       last_job_at: lastJobAt,
       jobs_processed: jobsProcessed,
     });
