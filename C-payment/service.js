@@ -131,8 +131,10 @@ app.post("/payments/reverse", async(req, res) => {
         RETURNING *
         `, [purchase_id]
     ); // we release the seat(s) for the purchase as well, as refunded.
-    await redis.publish('seat-released', JSON.stringify({ purchaseId: purchase_id, eventId: reservation.rows[0].event_id, seats: reservation.rows[0].seats }))
-    await redis.rPush('waitlist-queue', JSON.stringify({purchaseId: purchase_id, eventId: reservation.rows[0].event_id, seats: reservation.rows[0].seats }))
+    const purchaseInfo = await pool.query('SELECT user_id FROM purchases WHERE id = $1', [purchase_id]);
+    const userId = purchaseInfo.rows[0]?.user_id;
+    await redis.publish('seat-released', JSON.stringify({ purchaseId: purchase_id, eventId: reservation.rows[0].event_id, seats: reservation.rows[0].seats, userId }))
+    await redis.rPush('waitlist-queue', JSON.stringify({ purchaseId: purchase_id, eventId: reservation.rows[0].event_id, seats: reservation.rows[0].seats, userId }))
     console.log("Published to seat-released pubsub that seat(s) have been released.")
     const refunded = updated.rows[0];
     console.log(`refunded purchase ${purchase_id} and released all associated seats.`)
