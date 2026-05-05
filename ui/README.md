@@ -124,8 +124,9 @@ curl -s -X POST http://localhost:3006/events \
 "category": "Music"
 }'
 
-curl -s -X POST http://localhost:3006/events/EVENT_ID\
- -H "Content-Type: application/json" \
+Copy randomly generated ID from previous command into {EVENT_ID}
+curl -s -X POST http://localhost:3006/events/EVENT_ID/populate
+-H "Content-Type: application/json" \
  -d '{
 "basePrice": 100,
 "capacity": 10,
