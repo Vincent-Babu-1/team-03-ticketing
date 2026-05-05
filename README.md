@@ -22,7 +22,7 @@
 | Tien Nguyen          | fraud detection service + worker                              |
 | Vincent Babu         | k6 testing + Caddy; initial skeleton; README.md + Sprint Plan |
 | Ri Lu                | notif. worker + Redis pub/sub definitions                     |
-| Franco Htet          | User/dev UI pages(ui/)                                        |
+| Franco Htet          | User/dev UI pages(ui/) + caddy                                |
 
 > Ownership is verified by `git log --author`. Each person must have meaningful commits in the directories they claim.
 
@@ -96,13 +96,12 @@ Refund requests are sent to the Refund service, which checks the Refund database
 The repository now includes two static frontend surfaces under `ui/`:
 
 1. `ui/user/`
-The customer-facing ticket purchase demo. It loads events from the event catalog service, lets a user choose a section and quantity, and submits purchases through the purchase service.
+   The customer-facing ticket purchase demo. It loads events from the event catalog service, lets a user choose a section and quantity, and submits purchases through the purchase service.
 
 2. `ui/dev/`
-The developer dashboard. It provides a lightweight system overview for service and worker health, queue backlog visibility when a service reports it, and a quick visual reference for how the ticketing flow moves through the system.
+   The developer dashboard. It provides a lightweight system overview for service and worker health, queue backlog visibility when a service reports it, and a quick visual reference for how the ticketing flow moves through the system.
 
 Caddy serves both frontends. It rewrites `/` to the customer UI and serves the developer dashboard at `/dev/`. It also proxies same-origin health endpoints for the developer dashboard under `/api/system/...`.
-
 
 ---
 
@@ -120,9 +119,9 @@ Caddy serves both frontends. It rewrites `/` to the customer UI and serves the d
 ---
 
 ## Purchase Service
- 
+
 ### GET /health
- 
+
 ```
 GET /health
   Returns the health status of this service and its dependencies.
@@ -130,15 +129,15 @@ GET /health
     200  Service and all dependencies healthy
     503  One or more dependencies unreachable
 ```
- 
+
 Example request:
- 
+
 ```bash
 curl http://purchase-service:3001/health
 ```
- 
+
 Example response (200):
- 
+
 ```json
 {
   "service": "purchase",
@@ -147,9 +146,9 @@ Example response (200):
   "redis": "ok"
 }
 ```
- 
+
 Example response (503):
- 
+
 ```json
 {
   "service": "purchase",
@@ -158,11 +157,11 @@ Example response (503):
   "redis": "ok"
 }
 ```
- 
+
 ---
- 
+
 ### POST /purchases
- 
+
 ```
 POST /purchases
   Creates a new ticket purchase. Reserves the requested seats, calls the
@@ -187,9 +186,9 @@ POST /purchases
     402  Payment declined — purchase recorded as failed, seats released.
     503  Payment Service unreachable — seats released.
 ```
- 
+
 Example request:
- 
+
 ```bash
 curl -X POST http://purchase-service:3001/purchases \
   -H "Content-Type: application/json" \
@@ -201,9 +200,9 @@ curl -X POST http://purchase-service:3001/purchases \
     "seats": ["A1", "A2"]
   }' | jq .
 ```
- 
+
 Example response (200):
- 
+
 ```json
 {
   "purchaseId": "d0f2426b-20c7-4fbf-90cb-743d0ae00a5e",
@@ -211,30 +210,30 @@ Example response (200):
   "eventId": "cccccccc-0000-0000-0000-000000000001",
   "seats": ["A1", "A2"],
   "quantity": 2,
-  "totalUsd": 446.00,
+  "totalUsd": 446.0,
   "status": "confirmed",
   "createdAt": "2026-04-26T22:39:18.092Z"
 }
 ```
- 
+
 Example response (400):
- 
+
 ```json
 {
   "error": "Missing required fields or seats invalid, bad format or length"
 }
 ```
- 
+
 Example response (400 — seats already taken):
- 
+
 ```json
 {
   "error": "purchase aaaaaaaa-0000-0000-0000-000000000001: seat(s) already taken."
 }
 ```
- 
+
 Example response (402):
- 
+
 ```json
 {
   "purchaseId": "d0f2426b-20c7-4fbf-90cb-743d0ae00a5e",
@@ -242,24 +241,24 @@ Example response (402):
   "eventId": "cccccccc-0000-0000-0000-000000000001",
   "seats": ["A1", "A2"],
   "quantity": 2,
-  "totalUsd": 446.00,
+  "totalUsd": 446.0,
   "status": "failed",
   "createdAt": "2026-04-26T22:39:18.092Z"
 }
 ```
- 
+
 Example response (503):
- 
+
 ```json
 {
   "error": "Payment Service unavailable"
 }
 ```
- 
+
 ---
- 
+
 ### GET /purchases/:id
- 
+
 ```
 GET /purchases/:id
   Looks up and returns a single purchase by its purchase ID.
@@ -269,15 +268,15 @@ GET /purchases/:id
     200  Purchase found and returned.
     404  Purchase not found.
 ```
- 
+
 Example request:
- 
+
 ```bash
 curl http://purchase-service:3001/purchases/d0f2426b-20c7-4fbf-90cb-743d0ae00a5e | jq .
 ```
- 
+
 Example response (200):
- 
+
 ```json
 {
   "id": "d0f2426b-20c7-4fbf-90cb-743d0ae00a5e",
@@ -292,19 +291,19 @@ Example response (200):
   "created_at": "2026-04-26T22:39:18.087Z"
 }
 ```
- 
+
 Example response (404):
- 
+
 ```json
 {
   "error": "Purchase not found"
 }
 ```
- 
+
 ---
- 
+
 ### GET /reservations/:id
- 
+
 ```
 GET /reservations/:id
   Looks up and returns a single seat reservation by its reservation ID.
@@ -314,15 +313,15 @@ GET /reservations/:id
     200  Reservation found and returned.
     404  Reservation not found.
 ```
- 
+
 Example request:
- 
+
 ```bash
 curl http://purchase-service:3001/reservations/e1a2b3c4-0000-0000-0000-000000000001 | jq .
 ```
- 
+
 Example response (200):
- 
+
 ```json
 {
   "id": "e1a2b3c4-0000-0000-0000-000000000001",
@@ -335,21 +334,21 @@ Example response (200):
   "updated_at": "2026-04-26T21:46:00.139Z"
 }
 ```
- 
+
 Example response (404):
- 
+
 ```json
 {
   "error": "Reservation not found"
 }
 ```
- 
+
 ---
- 
+
 ## Payment Service
- 
+
 ### GET /health
- 
+
 ```
 GET /health
   Returns the health status of this service and its dependencies.
@@ -357,15 +356,15 @@ GET /health
     200  Service and all dependencies healthy
     503  One or more dependencies unreachable
 ```
- 
+
 Example request:
- 
+
 ```bash
 curl http://payment-service:3001/health
 ```
- 
+
 Example response (200):
- 
+
 ```json
 {
   "service": "payment-service",
@@ -374,9 +373,9 @@ Example response (200):
   "redis": "ok"
 }
 ```
- 
+
 Example response (503):
- 
+
 ```json
 {
   "service": "payment-service",
@@ -385,11 +384,11 @@ Example response (503):
   "redis": "ok"
 }
 ```
- 
+
 ---
- 
+
 ### POST /payments
- 
+
 ```
 POST /payments
   Called by Purchase Service only. Processes a simulated payment for a
@@ -403,9 +402,9 @@ POST /payments
     400  Missing or invalid fields.
     402  Payment declined.
 ```
- 
+
 Example request:
- 
+
 ```bash
 curl -X POST http://payment-service:3001/payments \
   -H "Content-Type: application/json" \
@@ -415,9 +414,9 @@ curl -X POST http://payment-service:3001/payments \
     "cardToken": "test-card"
   }' | jq .
 ```
- 
+
 Example response (200):
- 
+
 ```json
 {
   "payment_id": "cc34f7bc-9033-44e7-b5d4-423e65b08732",
@@ -426,17 +425,17 @@ Example response (200):
   "amount": "204.00"
 }
 ```
- 
+
 Example response (400):
- 
+
 ```json
 {
   "error": "Missing required fields: purchase_id, amount, cardToken"
 }
 ```
- 
+
 Example response (402):
- 
+
 ```json
 {
   "payment_id": "cc34f7bc-9033-44e7-b5d4-423e65b08732",
@@ -445,11 +444,11 @@ Example response (402):
   "amount": 0
 }
 ```
- 
+
 ---
- 
+
 ### GET /payments/:purchase_id
- 
+
 ```
 GET /payments/:purchase_id
   Looks up and returns a payment record by its purchase_id.
@@ -459,15 +458,15 @@ GET /payments/:purchase_id
     200  Payment found and returned.
     404  No payment found for the given purchase_id.
 ```
- 
+
 Example request:
- 
+
 ```bash
 curl http://payment-service:3001/payments/aaaaaaaa-0000-0000-0000-000000000001 | jq .
 ```
- 
+
 Example response (200):
- 
+
 ```json
 {
   "id": "cc34f7bc-9033-44e7-b5d4-423e65b08732",
@@ -479,19 +478,19 @@ Example response (200):
   "updated_at": "2026-04-26T22:45:52.305Z"
 }
 ```
- 
+
 Example response (404):
- 
+
 ```json
 {
   "error": "Payment with purchase_id aaaaaaaa-0000-0000-0000-000000000001 not found."
 }
 ```
- 
+
 ---
- 
+
 ### POST /payments/reverse
- 
+
 ```
 POST /payments/reverse
   Called by Refund Service only. Reverses a succeeded payment. Idempotent
@@ -507,9 +506,9 @@ POST /payments/reverse
     400  Missing fields, or payment status is failed — nothing to refund.
     404  No payment found for the given purchase_id.
 ```
- 
+
 Example request:
- 
+
 ```bash
 curl -X POST http://payment-service:3001/payments/reverse \
   -H "Content-Type: application/json" \
@@ -518,9 +517,9 @@ curl -X POST http://payment-service:3001/payments/reverse \
     "refund_id": "dddddddd-0000-0000-0000-000000000001"
   }' | jq .
 ```
- 
+
 Example response (200):
- 
+
 ```json
 {
   "payment_id": "cc34f7bc-9033-44e7-b5d4-423e65b08732",
@@ -530,35 +529,37 @@ Example response (200):
   "total_usd": "204.00"
 }
 ```
- 
+
 Example response (400 — missing fields):
- 
+
 ```json
 {
   "error": "Missing purchase_id to refund."
 }
 ```
- 
+
 Example response (400 — payment failed, nothing to refund):
- 
+
 ```json
 {
   "error": "Payment failed, nothing to refund for purchase: aaaaaaaa-0000-0000-0000-000000000001"
 }
 ```
- 
+
 Example response (404):
- 
+
 ```json
 {
   "error": "No payment found of purchase id: aaaaaaaa-0000-0000-0000-000000000001"
 }
 ```
+
 ---
 
 ## Refund Service
 
 ### GET /health
+
 ```
 GET /health
   Returns the health status of this service and its dependencies.
@@ -616,7 +617,9 @@ curl -s -X POST http://refund-service:3001/refund-request \
   -H "Idempotency-Key: a0eebc99--4ef8-bb6d-6bb9bd387776" \
   -d '{"refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776", "purchaseId": "df33337e-9fac-4854-9ad8-3af18d822cfc"}' | jq .
 ```
+
 **Example response (200):**
+
 ```json
 {
   "refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776",
@@ -624,7 +627,9 @@ curl -s -X POST http://refund-service:3001/refund-request \
   "success": true
 }
 ```
+
 **Example response (202):**
+
 ```json
 {
   "refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776",
@@ -635,6 +640,7 @@ curl -s -X POST http://refund-service:3001/refund-request \
 ```
 
 **Example response (400):**
+
 ```json
 {
   "refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776",
@@ -643,7 +649,9 @@ curl -s -X POST http://refund-service:3001/refund-request \
   "failureReason": "purchase_missing"
 }
 ```
+
 **Example response (404):**
+
 ```json
 {
   "refundRequestId": "a0eebc99--4ef8-bb6d-6bb9bd387776",
@@ -652,9 +660,11 @@ curl -s -X POST http://refund-service:3001/refund-request \
   "failureReason": "idempotency_skip"
 }
 ```
-### Notification Service 
+
+### Notification Service
 
 ### GET /health
+
 ```
 GET /health
   Returns the health status of this service and its dependencies.
@@ -757,12 +767,15 @@ curl -s -X POST http://notif-service:3001/dlq/requeue | jq .
 The Analytics Worker takes purchase and browse events from the `analytics-queue` Redis queue and writes aggregate stats to the analytics DB. Invalid events are routed to the `analytics-queue:dlq` dead letter queue.
 
 ### GET /health
+
 Returns 200 if DB and Redis are healthy, 503 if degraded. Also returns queue depth, DLQ depth, and last processed job timestamp.
+
 ```bash
 curl http://analytics-worker:3001/health | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
   "service": "analytics-worker",
@@ -774,13 +787,17 @@ curl http://analytics-worker:3001/health | jq .
   "redis": "ok"
 }
 ```
+
 ### GET /analytics
+
 Returns aggregate ticket sales and browse counts for all events from the analytics DB.
+
 ```bash
 curl http://analytics-worker:3001/analytics | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
   "events": [
@@ -797,21 +814,25 @@ curl http://analytics-worker:3001/analytics | jq .
 ### Testing
 
 Inject a valid purchase event directly into the queue:
+
 ```bash
 redis-cli -h redis RPUSH analytics-queue '{"event":"ticket_purchased","purchaseId":"aaaaaaaa-0000-0000-0000-000000000001","eventId":"cccccccc-0000-0000-0000-000000000001","quantity":2}'
 ```
 
 Then verify it was recorded:
+
 ```bash
 curl http://analytics-worker:3001/analytics | jq .
 ```
 
 Inject invalid data to test DLQ:
+
 ```bash
 redis-cli -h redis RPUSH analytics-queue '{"event":"ticket_purchased","purchaseId":"missing-event-id"}'
 ```
 
 Verify DLQ depth increased:
+
 ```bash
 curl http://analytics-worker:3001/health | jq '{dlqDepth}'
 ```
@@ -823,12 +844,15 @@ curl http://analytics-worker:3001/health | jq '{dlqDepth}'
 The Event Catalog Service manages event listings, venues, dates, and seat maps. It owns the events database and caches popular event details in Redis.
 
 ### GET /health
+
 Returns 200 if Postgres and Redis are healthy, 503 if one or more dependencies are unhealthy.
+
 ```bash
 curl http://event-catalog-service:3006/health | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
   "status": "healthy",
@@ -849,6 +873,7 @@ curl http://event-catalog-service:3006/health | jq .
 ```
 
 **Example response (503):**
+
 ```json
 {
   "status": "unhealthy",
@@ -869,12 +894,15 @@ curl http://event-catalog-service:3006/health | jq .
 ```
 
 ### GET /events
+
 Returns all events ordered by `date_time`. Uses Redis cache key `events:all`.
+
 ```bash
 curl http://event-catalog-service:3006/events | jq .
 ```
 
 **Example response (200):**
+
 ```json
 [
   {
@@ -890,6 +918,7 @@ curl http://event-catalog-service:3006/events | jq .
 ```
 
 **Example response (500):**
+
 ```json
 {
   "error": "Internal server error"
@@ -897,12 +926,15 @@ curl http://event-catalog-service:3006/events | jq .
 ```
 
 ### GET /events/:eventId
+
 Returns one event by ID. Uses Redis cache key `events:{eventId}`.
+
 ```bash
 curl http://event-catalog-service:3006/events/EVENT_ID | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
   "id": "event-uuid",
@@ -916,6 +948,7 @@ curl http://event-catalog-service:3006/events/EVENT_ID | jq .
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Event not found"
@@ -923,7 +956,9 @@ curl http://event-catalog-service:3006/events/EVENT_ID | jq .
 ```
 
 ### POST /events
+
 Creates a new event. Requires `name`, `venue`, `base_price`, and `date_time`; `description` and `category` are optional.
+
 ```bash
 curl -X POST http://event-catalog-service:3006/events \
   -H "Content-Type: application/json" \
@@ -938,6 +973,7 @@ curl -X POST http://event-catalog-service:3006/events \
 ```
 
 **Example response (201):**
+
 ```json
 {
   "id": "event-uuid",
@@ -951,6 +987,7 @@ curl -X POST http://event-catalog-service:3006/events \
 ```
 
 **Example response (400):**
+
 ```json
 {
   "error": "name, venue, base_price, and date_time are required"
@@ -958,12 +995,15 @@ curl -X POST http://event-catalog-service:3006/events \
 ```
 
 ### DELETE /events/:eventId
+
 Deletes an event by ID. Deleting an event also deletes its sections and seats because of `ON DELETE CASCADE`.
+
 ```bash
 curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
   "message": "Event deleted successfully",
@@ -980,6 +1020,7 @@ curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID | jq .
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Event not found"
@@ -987,7 +1028,9 @@ curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID | jq .
 ```
 
 ### POST /events/:eventId/populate
+
 Populates an existing event with sections and seats. Creates one section for each name in `sectionNames` and creates `capacity` seats for each section.
+
 ```bash
 curl -X POST http://event-catalog-service:3006/events/EVENT_ID/populate \
   -H "Content-Type: application/json" \
@@ -999,6 +1042,7 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/populate \
 ```
 
 **Example response (201):**
+
 ```json
 {
   "message": "Event populated successfully",
@@ -1025,6 +1069,7 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/populate \
 ```
 
 **Example response (400):**
+
 ```json
 {
   "error": "basePrice and capacity are required"
@@ -1032,6 +1077,7 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/populate \
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Event not found"
@@ -1039,12 +1085,15 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/populate \
 ```
 
 ### GET /events/:eventId/sections
+
 Returns all sections for an event, including `seats_available`, calculated from seats where `status = available`.
+
 ```bash
 curl http://event-catalog-service:3006/events/EVENT_ID/sections | jq .
 ```
 
 **Example response (200):**
+
 ```json
 [
   {
@@ -1059,6 +1108,7 @@ curl http://event-catalog-service:3006/events/EVENT_ID/sections | jq .
 ```
 
 **Example response (500):**
+
 ```json
 {
   "error": "Internal server error"
@@ -1066,12 +1116,15 @@ curl http://event-catalog-service:3006/events/EVENT_ID/sections | jq .
 ```
 
 ### GET /events/:eventId/sections/:sectionId
+
 Returns one section for an event, including `seats_available`, calculated from seats where `status = available`.
+
 ```bash
 curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
   "id": "section-uuid",
@@ -1084,6 +1137,7 @@ curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID | jq 
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Section not found for this event"
@@ -1091,7 +1145,9 @@ curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID | jq 
 ```
 
 ### POST /events/:eventId/sections
+
 Creates a new section for an event. Requires `section_name` and `price`; `capacity` is optional.
+
 ```bash
 curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections \
   -H "Content-Type: application/json" \
@@ -1103,6 +1159,7 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections \
 ```
 
 **Example response (201):**
+
 ```json
 {
   "id": "section-uuid",
@@ -1114,6 +1171,7 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections \
 ```
 
 **Example response (400):**
+
 ```json
 {
   "error": "section_name and price are required"
@@ -1121,6 +1179,7 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections \
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Event not found"
@@ -1128,7 +1187,9 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections \
 ```
 
 ### PUT /events/:eventId/sections/:sectionId
+
 Updates a section. Optional body fields are `section_name`, `price`, and `capacity`.
+
 ```bash
 curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID \
   -H "Content-Type: application/json" \
@@ -1140,6 +1201,7 @@ curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_I
 ```
 
 **Example response (200):**
+
 ```json
 {
   "id": "section-uuid",
@@ -1151,6 +1213,7 @@ curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_I
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Section not found for this event"
@@ -1158,12 +1221,15 @@ curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_I
 ```
 
 ### DELETE /events/:eventId/sections/:sectionId
+
 Deletes a section from an event. Deleting a section also deletes its seats because of `ON DELETE CASCADE`.
+
 ```bash
 curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
   "message": "Section deleted successfully",
@@ -1178,6 +1244,7 @@ curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID/sections/SECTIO
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Section not found for this event"
@@ -1185,12 +1252,15 @@ curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID/sections/SECTIO
 ```
 
 ### GET /events/:eventId/seats
+
 Returns all seats for an event. Seats are found by joining `seats.section_id` to `event_sections.id`.
+
 ```bash
 curl http://event-catalog-service:3006/events/EVENT_ID/seats | jq .
 ```
 
 **Example response (200):**
+
 ```json
 [
   {
@@ -1204,6 +1274,7 @@ curl http://event-catalog-service:3006/events/EVENT_ID/seats | jq .
 ```
 
 **Example response (500):**
+
 ```json
 {
   "error": "Internal server error"
@@ -1211,12 +1282,15 @@ curl http://event-catalog-service:3006/events/EVENT_ID/seats | jq .
 ```
 
 ### GET /events/:eventId/sections/:sectionId/seats
+
 Returns all seats in a specific section and verifies that the section belongs to the event.
+
 ```bash
 curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats | jq .
 ```
 
 **Example response (200):**
+
 ```json
 [
   {
@@ -1237,6 +1311,7 @@ curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats
 ```
 
 **Example response (500):**
+
 ```json
 {
   "error": "Internal server error"
@@ -1244,12 +1319,15 @@ curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats
 ```
 
 ### GET /events/:eventId/sections/:sectionId/seats/:seatId
+
 Returns one seat and verifies that the seat belongs to the given section and event.
+
 ```bash
 curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats/SEAT_ID | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
   "id": "seat-uuid",
@@ -1261,6 +1339,7 @@ curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Seat not found"
@@ -1268,7 +1347,9 @@ curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats
 ```
 
 ### POST /events/:eventId/sections/:sectionId/seats
+
 Creates one seat in a section. Requires `row` and `seat_number`; `status` is optional and defaults to `available`.
+
 ```bash
 curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats \
   -H "Content-Type: application/json" \
@@ -1280,6 +1361,7 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_
 ```
 
 **Example response (201):**
+
 ```json
 {
   "id": "seat-uuid",
@@ -1291,6 +1373,7 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_
 ```
 
 **Example response (400):**
+
 ```json
 {
   "error": "row and seat_number are required"
@@ -1298,6 +1381,7 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Section not found for this event"
@@ -1305,7 +1389,9 @@ curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_
 ```
 
 ### PUT /events/:eventId/sections/:sectionId/seats/:seatId
+
 Updates one seat. Optional body fields are `row`, `seat_number`, and `status`; status must be `available`, `reserved`, or `sold`.
+
 ```bash
 curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats/SEAT_ID \
   -H "Content-Type: application/json" \
@@ -1315,6 +1401,7 @@ curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_I
 ```
 
 **Example response (200):**
+
 ```json
 {
   "id": "seat-uuid",
@@ -1326,6 +1413,7 @@ curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_I
 ```
 
 **Example response (400):**
+
 ```json
 {
   "error": "status must be available, reserved, or sold"
@@ -1333,6 +1421,7 @@ curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_I
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Seat not found"
@@ -1340,12 +1429,15 @@ curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_I
 ```
 
 ### DELETE /events/:eventId/sections/:sectionId/seats/:seatId
+
 Deletes one seat and verifies that the seat belongs to the given section and event.
+
 ```bash
 curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats/SEAT_ID | jq .
 ```
 
 **Example response (200):**
+
 ```json
 {
   "message": "Seat deleted successfully",
@@ -1360,6 +1452,7 @@ curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID/sections/SECTIO
 ```
 
 **Example response (404):**
+
 ```json
 {
   "error": "Seat not found"
