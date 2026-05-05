@@ -91,6 +91,8 @@ Purchases are sent to the Purchase Service, which checks seat availability, rese
 
 Refund requests are sent to the Refund service, which checks the Refund database and synchronously calls the Purchase service to determine whether the request is valid. If the request is valid, then the request is noted in the Refund database as successful and the Payment service is contacted to reverse the charge.
 
+The Fraud Detection Worker consumes purchase events from the Redis queue (purchase-events) and analyzes them to detect suspicious behavior patterns such as payment token reuse or rapid repeated purchases by the same user. For each event, it applies fraud detection rules and, if a violation is found, records the alert in the fraud_flags database table and publishes a fraud-flagged event to Redis so other services can react if needed. The worker also implements a dead-letter queue (DLQ) by capturing malformed or invalid messages and storing them in a separate Redis list (fraud-dlq) to prevent crashes and allow later inspection.
+
 ## Frontend Overview
 
 The repository now includes two static frontend surfaces under `ui/`:
@@ -817,6 +819,64 @@ curl http://analytics-worker:3001/health | jq '{dlqDepth}'
 ```
 
 ---
+
+---
+## Fraud Detection Worker
+
+The Fraud Worker consumes purchase events from the `purchase-events` Redis queue and analyzes them to detect suspicious behavior such as payment token reuse or rapid repeated purchases. When fraud is detected, it records an alert in the `fraud_flags` database table and publishes a `fraud-flagged` event. Invalid or malformed events are routed to the `fraud-dlq` dead letter queue. The worker also enforces idempotency by tracking processed `purchase_id`s to prevent duplicate fraud alerts.
+
+
+### GET /health
+Returns 200 if DB and Redis are healthy, 503 if degraded. Also returns queue depth, DLQ depth, and last processed job timestamp.
+```bash
+curl http://fraud-worker:3008/health | jq .
+---
+
+**Example response (200):**
+```json
+{
+  "status": "ok",
+  "checks": {
+    "redis": "ok",
+    "database": "ok"
+  },
+  "queueDepth": 0,
+  "dlqDepth": 0,
+  "lastJobAt": "2026-05-05T04:12:19.492Z"
+}
+```
+
+### Testing
+
+Inject a valid purchase event directly into the queue:
+
+```bash
+redis-cli -h redis RPUSH purchase-events '{"purchase_id":"p1","userId":"u1","paymentToken":"tok1"}
+
+
+redis-cli -h redis RPUSH purchase-events '{"purchase_id":"p1","userId":"u1","paymentToken":"tok1"}'
+```
+
+Verify it was processed by checking logs:
+```bash
+docker compose logs -f fraud-worker
+```
+
+Inject duplicate events to test idempotency:
+```bash
+redis-cli -h redis RPUSH purchase-events '{"purchase_id":"dup1","userId":"u1","paymentToken":"tok1"}'
+redis-cli -h redis RPUSH purchase-events '{"purchase_id":"dup1","userId":"u1","paymentToken":"tok1"}'
+```
+
+
+Inject invalid data to test DLQ:
+```bash
+redis-cli -h redis RPUSH purchase-events 'INVALID_JSON'
+```
+Verify DLQ depth increased:
+```bash
+curl http://fraud-worker:3008/health | jq '{dlqDepth}'
+```
 
 ### Event Catalog Service
 
