@@ -216,7 +216,7 @@ SELECT table_name
 SELECT * FROM refunds;
 
 mkdir -p results
-k6 run --summary-export results/k6-sprint-3-poison-output-summary.json /workspace/k6/sprint-3-poison.js | tee results/k6-sprint-3-poison-output.txt
+k6 run --summary-export results/k6-sprint-4-scale-output-summary.json /workspace/k6/sprint-4-scale.js | tee results/k6-sprint-4-scale-output.txt
 
 healthcheck http://purchase-service:3001/health
 curl http://purchase-service:3001/health | jq .

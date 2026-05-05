@@ -56,7 +56,7 @@
         reverse_proxy purchase-service:3001
     }
 
-    handle =/ {
+    handle / {
         rewrite * /user/index.html
         file_server
     }

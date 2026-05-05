@@ -817,6 +817,555 @@ curl http://analytics-worker:3001/health | jq '{dlqDepth}'
 ```
 
 ---
+
+### Event Catalog Service
+
+The Event Catalog Service manages event listings, venues, dates, and seat maps. It owns the events database and caches popular event details in Redis.
+
+### GET /health
+Returns 200 if Postgres and Redis are healthy, 503 if one or more dependencies are unhealthy.
+```bash
+curl http://event-catalog-service:3006/health | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "status": "healthy",
+  "service": "event-catalog",
+  "timestamp": "2026-04-25T12:00:00.000Z",
+  "uptime_seconds": 120,
+  "checks": {
+    "database": {
+      "status": "healthy",
+      "latency_ms": 2
+    },
+    "redis": {
+      "status": "healthy",
+      "latency_ms": 1
+    }
+  }
+}
+```
+
+**Example response (503):**
+```json
+{
+  "status": "unhealthy",
+  "service": "event-catalog",
+  "timestamp": "2026-04-25T12:00:00.000Z",
+  "uptime_seconds": 120,
+  "checks": {
+    "database": {
+      "status": "healthy",
+      "latency_ms": 2
+    },
+    "redis": {
+      "status": "unhealthy",
+      "error": "Redis ping failed"
+    }
+  }
+}
+```
+
+### GET /events
+Returns all events ordered by `date_time`. Uses Redis cache key `events:all`.
+```bash
+curl http://event-catalog-service:3006/events | jq .
+```
+
+**Example response (200):**
+```json
+[
+  {
+    "id": "event-uuid",
+    "name": "Concert Night",
+    "venue": "TD Garden",
+    "base_price": "100.00",
+    "date_time": "2026-05-01T20:00:00.000Z",
+    "description": "Live concert event",
+    "category": "Music"
+  }
+]
+```
+
+**Example response (500):**
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+### GET /events/:eventId
+Returns one event by ID. Uses Redis cache key `events:{eventId}`.
+```bash
+curl http://event-catalog-service:3006/events/EVENT_ID | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "id": "event-uuid",
+  "name": "Concert Night",
+  "venue": "TD Garden",
+  "base_price": "100.00",
+  "date_time": "2026-05-01T20:00:00.000Z",
+  "description": "Live concert event",
+  "category": "Music"
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Event not found"
+}
+```
+
+### POST /events
+Creates a new event. Requires `name`, `venue`, `base_price`, and `date_time`; `description` and `category` are optional.
+```bash
+curl -X POST http://event-catalog-service:3006/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Concert Night",
+    "venue": "TD Garden",
+    "base_price": 100,
+    "date_time": "2026-05-01T20:00:00Z",
+    "description": "Live concert event",
+    "category": "Music"
+  }' | jq .
+```
+
+**Example response (201):**
+```json
+{
+  "id": "event-uuid",
+  "name": "Concert Night",
+  "venue": "TD Garden",
+  "base_price": "100.00",
+  "date_time": "2026-05-01T20:00:00.000Z",
+  "description": "Live concert event",
+  "category": "Music"
+}
+```
+
+**Example response (400):**
+```json
+{
+  "error": "name, venue, base_price, and date_time are required"
+}
+```
+
+### DELETE /events/:eventId
+Deletes an event by ID. Deleting an event also deletes its sections and seats because of `ON DELETE CASCADE`.
+```bash
+curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "message": "Event deleted successfully",
+  "deletedEvent": {
+    "id": "event-uuid",
+    "name": "Concert Night",
+    "venue": "TD Garden",
+    "base_price": "100.00",
+    "date_time": "2026-05-01T20:00:00.000Z",
+    "description": "Live concert event",
+    "category": "Music"
+  }
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Event not found"
+}
+```
+
+### POST /events/:eventId/populate
+Populates an existing event with sections and seats. Creates one section for each name in `sectionNames` and creates `capacity` seats for each section.
+```bash
+curl -X POST http://event-catalog-service:3006/events/EVENT_ID/populate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "basePrice": 100,
+    "capacity": 10,
+    "sectionNames": ["RowC", "RowB", "RowA"]
+  }' | jq .
+```
+
+**Example response (201):**
+```json
+{
+  "message": "Event populated successfully",
+  "eventId": "event-uuid",
+  "sections": [
+    {
+      "id": "section-uuid",
+      "event_id": "event-uuid",
+      "section_name": "RowC",
+      "price": "100.00",
+      "capacity": 10,
+      "seats": [
+        {
+          "id": "seat-uuid",
+          "section_id": "section-uuid",
+          "row": "RowC",
+          "seat_number": 1,
+          "status": "available"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Example response (400):**
+```json
+{
+  "error": "basePrice and capacity are required"
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Event not found"
+}
+```
+
+### GET /events/:eventId/sections
+Returns all sections for an event, including `seats_available`, calculated from seats where `status = available`.
+```bash
+curl http://event-catalog-service:3006/events/EVENT_ID/sections | jq .
+```
+
+**Example response (200):**
+```json
+[
+  {
+    "id": "section-uuid",
+    "event_id": "event-uuid",
+    "section_name": "RowA",
+    "price": "100.00",
+    "capacity": 10,
+    "seats_available": "10"
+  }
+]
+```
+
+**Example response (500):**
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+### GET /events/:eventId/sections/:sectionId
+Returns one section for an event, including `seats_available`, calculated from seats where `status = available`.
+```bash
+curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "id": "section-uuid",
+  "event_id": "event-uuid",
+  "section_name": "RowA",
+  "price": "100.00",
+  "capacity": 10,
+  "seats_available": "10"
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Section not found for this event"
+}
+```
+
+### POST /events/:eventId/sections
+Creates a new section for an event. Requires `section_name` and `price`; `capacity` is optional.
+```bash
+curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections \
+  -H "Content-Type: application/json" \
+  -d '{
+    "section_name": "Balcony 101",
+    "price": 75,
+    "capacity": 120
+  }' | jq .
+```
+
+**Example response (201):**
+```json
+{
+  "id": "section-uuid",
+  "event_id": "event-uuid",
+  "section_name": "Balcony 101",
+  "price": "75.00",
+  "capacity": 120
+}
+```
+
+**Example response (400):**
+```json
+{
+  "error": "section_name and price are required"
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Event not found"
+}
+```
+
+### PUT /events/:eventId/sections/:sectionId
+Updates a section. Optional body fields are `section_name`, `price`, and `capacity`.
+```bash
+curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID \
+  -H "Content-Type: application/json" \
+  -d '{
+    "section_name": "Balcony 102",
+    "price": 85,
+    "capacity": 150
+  }' | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "id": "section-uuid",
+  "event_id": "event-uuid",
+  "section_name": "Balcony 102",
+  "price": "85.00",
+  "capacity": 150
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Section not found for this event"
+}
+```
+
+### DELETE /events/:eventId/sections/:sectionId
+Deletes a section from an event. Deleting a section also deletes its seats because of `ON DELETE CASCADE`.
+```bash
+curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "message": "Section deleted successfully",
+  "deletedSection": {
+    "id": "section-uuid",
+    "event_id": "event-uuid",
+    "section_name": "Balcony 102",
+    "price": "85.00",
+    "capacity": 150
+  }
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Section not found for this event"
+}
+```
+
+### GET /events/:eventId/seats
+Returns all seats for an event. Seats are found by joining `seats.section_id` to `event_sections.id`.
+```bash
+curl http://event-catalog-service:3006/events/EVENT_ID/seats | jq .
+```
+
+**Example response (200):**
+```json
+[
+  {
+    "id": "seat-uuid",
+    "section_id": "section-uuid",
+    "row": "RowA",
+    "seat_number": 1,
+    "status": "available"
+  }
+]
+```
+
+**Example response (500):**
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+### GET /events/:eventId/sections/:sectionId/seats
+Returns all seats in a specific section and verifies that the section belongs to the event.
+```bash
+curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats | jq .
+```
+
+**Example response (200):**
+```json
+[
+  {
+    "id": "seat-uuid",
+    "section_id": "section-uuid",
+    "row": "RowA",
+    "seat_number": 1,
+    "status": "available"
+  },
+  {
+    "id": "seat-uuid",
+    "section_id": "section-uuid",
+    "row": "RowA",
+    "seat_number": 2,
+    "status": "reserved"
+  }
+]
+```
+
+**Example response (500):**
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+### GET /events/:eventId/sections/:sectionId/seats/:seatId
+Returns one seat and verifies that the seat belongs to the given section and event.
+```bash
+curl http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats/SEAT_ID | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "id": "seat-uuid",
+  "section_id": "section-uuid",
+  "row": "RowA",
+  "seat_number": 1,
+  "status": "available"
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Seat not found"
+}
+```
+
+### POST /events/:eventId/sections/:sectionId/seats
+Creates one seat in a section. Requires `row` and `seat_number`; `status` is optional and defaults to `available`.
+```bash
+curl -X POST http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats \
+  -H "Content-Type: application/json" \
+  -d '{
+    "row": "A",
+    "seat_number": 1,
+    "status": "available"
+  }' | jq .
+```
+
+**Example response (201):**
+```json
+{
+  "id": "seat-uuid",
+  "section_id": "section-uuid",
+  "row": "A",
+  "seat_number": 1,
+  "status": "available"
+}
+```
+
+**Example response (400):**
+```json
+{
+  "error": "row and seat_number are required"
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Section not found for this event"
+}
+```
+
+### PUT /events/:eventId/sections/:sectionId/seats/:seatId
+Updates one seat. Optional body fields are `row`, `seat_number`, and `status`; status must be `available`, `reserved`, or `sold`.
+```bash
+curl -X PUT http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats/SEAT_ID \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "reserved"
+  }' | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "id": "seat-uuid",
+  "section_id": "section-uuid",
+  "row": "A",
+  "seat_number": 1,
+  "status": "reserved"
+}
+```
+
+**Example response (400):**
+```json
+{
+  "error": "status must be available, reserved, or sold"
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Seat not found"
+}
+```
+
+### DELETE /events/:eventId/sections/:sectionId/seats/:seatId
+Deletes one seat and verifies that the seat belongs to the given section and event.
+```bash
+curl -X DELETE http://event-catalog-service:3006/events/EVENT_ID/sections/SECTION_ID/seats/SEAT_ID | jq .
+```
+
+**Example response (200):**
+```json
+{
+  "message": "Seat deleted successfully",
+  "deletedSeat": {
+    "id": "seat-uuid",
+    "section_id": "section-uuid",
+    "row": "A",
+    "seat_number": 1,
+    "status": "available"
+  }
+}
+```
+
+**Example response (404):**
+```json
+{
+  "error": "Seat not found"
+}
+```
+
 ## Sprint History
 
 | Sprint | Tag        | Plan                                              | Report                                    |
