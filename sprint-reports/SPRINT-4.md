@@ -8,9 +8,7 @@
 
 ## What We Built
 
-[Which services are replicated? How does load balancing work? What polish work was completed?]
-
-The three workers that consume from queues (the analytics worker, the fraud worker, and the waitlist worker) are the services that are replicable. Load balancing is implemented via Caddy, which takes requests and routes them to workers first by weight, then by round robin sorting. 
+The three workers that consume from queues (the analytics worker, the fraud worker, and the waitlist worker) are the services that are replicable. Load balancing is implemented via Caddy, which takes requests and routes them to workers first by weight, then by round robin sorting. Polish work was reserved for our Caddyfile and minor typos, but mostly updates to our group README.md to properly document our system overview.
 
 ---
 
@@ -75,13 +73,15 @@ team-03-ticketing-waitlist-worker-3        team-03-ticketing-waitlist-worker    
 
 - [X] At least [N] services replicated via `--scale`
 - [X] Load balancer distributes traffic across replicas (visible in logs)
-- [ ] Services are stateless — multiple instances run without conflicts
+- [X] Services are stateless — multiple instances run without conflicts
 - [X] `docker compose ps` shows all replicas as `(healthy)`
-- [ ] System is fully complete for team size
+- [X] System is fully complete for team size
 
 ---
 
 ## What Is Not Working / Cut
+
+Every component of our system is delivered, although not yet thoroughly tested. Similar future projects might be more thorough in their testing of every service and worker, whereas our k6 tests are limited to single avenues of workflow.
 
 ---
 
@@ -113,7 +113,6 @@ Timeline:
 | [50]s | Traffic redistributed, back to normal |
 
 ```
-[Paste k6 output showing before / during / after the failure — annotate with timestamps]
 Before Failure 
 ```
 docker compose ps
@@ -165,13 +164,6 @@ team-03-ticketing-waitlist-worker-3        team-03-ticketing-waitlist-worker    
 After restart — `docker compose ps`:
 
 ```
- team-03-ticketing % docker compose up -d analytics-worker
-[+] up 4/4
- ✔ Container redis                                Healthy                                                                                                               2.3s
- ✔ Container analytics-db                         Healthy                                                                                                               2.3s
- ✔ Container team-03-ticketing-analytics-worker-3 Removed                                                                                                               1.7s
- ✔ Container team-03-ticketing-analytics-worker-2 Removed                                                                                                               1.7s
-KatelynLeung@vl965-172-31-74-105 team-03-ticketing % docker compose ps
 NAME                                       IMAGE                                    COMMAND                  SERVICE                CREATED          STATUS                    PORTS
 analytics-db                               postgres:16                              "docker-entrypoint.s…"   analytics-db           12 minutes ago   Up 12 minutes (healthy)   0.0.0.0:5436->5432/tcp, [::]:5436->5432/tcp
 event-cat-db                               postgres:16                              "docker-entrypoint.s…"   event-cat-db           12 minutes ago   Up 12 minutes (healthy)   0.0.0.0:5433->5432/tcp, [::]:5433->5432/tcp
@@ -194,8 +186,9 @@ team-03-ticketing-notification-worker-1    team-03-ticketing-notification-worker
 team-03-ticketing-waitlist-worker-1        team-03-ticketing-waitlist-worker        "docker-entrypoint.s…"   waitlist-worker        12 minutes ago   Up 11 minutes (healthy)   
 team-03-ticketing-waitlist-worker-2        team-03-ticketing-waitlist-worker        "docker-entrypoint.s…"   waitlist-worker        12 minutes ago   Up 11 minutes (healthy)   
 team-03-ticketing-waitlist-worker-3        team-03-ticketing-waitlist-worker        "docker-entrypoint.s…"   waitlist-worker        12 minutes ago   Up 11 minutes (healthy)
-```
 
 ---
 
 ## Blockers and Lessons Learned
+
+A few of our group members had minimal work to do this sprint. That's good for easing the workload on our team, but we must be careful that a lack of involvement does not progress into a feeling that members lack possession of the project. That feeling might cause members to see themselves as separate from the project, and therefore lose responsibility/investment in its results.
