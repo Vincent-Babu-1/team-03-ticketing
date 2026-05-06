@@ -216,7 +216,7 @@ SELECT table_name
 SELECT * FROM refunds;
 
 mkdir -p results
-k6 run --summary-export results/k6-sprint-3-poison-output-summary.json /workspace/k6/sprint-3-poison.js | tee results/k6-sprint-3-poison-output.txt
+k6 run --summary-export results/k6-sprint-4-scale-output-summary.json /workspace/k6/sprint-4-scale.js | tee results/k6-sprint-4-scale-output.txt
 
 healthcheck http://purchase-service:3001/health
 curl http://purchase-service:3001/health | jq .
@@ -240,5 +240,5 @@ curl -s -X POST http://payment-service:3001/payments \
 curl -s -X POST http://purchase-service:3001/purchases \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: aaaaaaaa-0000-0000-0000-000000000001" \
-  -d '{"userId": "bbbbbbbb-0000-0000-0000-000000000001", "eventId": "cccccccc-0000-0000-0000-000000000001", "cardToken": "test-card", "seats": ["A1", "A2"]}' | jq .
+  -d '{"userId": "bbbbbbbb-0000-0000-0000-000000000001", "eventId": "cccccccc-0000-0000-0000-000000000001", "cardToken": "test-card", "seats": ["A-1"]}' | jq .
 */

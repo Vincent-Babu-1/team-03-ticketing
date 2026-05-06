@@ -22,7 +22,7 @@ const db = new pg.Pool({ connectionString: DATABASE_URL });
 let lastJobAt = null;
 const recentPurchases = new Map();
 const paymentTokenMap = new Map();
-
+const processedPurchases = new Set();
 // ---------------------------
 // FRAUD RULES
 // ---------------------------
@@ -33,7 +33,7 @@ function suspicious_activity(event) {
   const tokenCount = (paymentTokenMap.get(paymentToken) || 0) + 1;
   paymentTokenMap.set(paymentToken, tokenCount);
 
-  if (tokenCount > 3) return "payment_token_reuse";
+  if (tokenCount > 1) return "payment_token_reuse";
 
   // Rule 2: rapid purchases
   const now = Date.now();
@@ -81,6 +81,10 @@ function runWorker() {
       
       if (!event.userId || !event.paymentToken) {
         await sendToDLQ(raw, "missing_fields");
+        return setImmediate(loop);
+      }
+      if (processedPurchases.has(event.purchase_id)) {
+        console.log("Duplicate ignored:", event.purchase_id);
         return setImmediate(loop);
       }
       const reason = suspicious_activity(event);
@@ -143,15 +147,16 @@ app.get("/health", async (req, res) => {
     }
     
     await redisClient.ping();
-
+    const queueDepth = await redisClient.lLen(QUEUE_NAME);
+    const dlqDepth = await redisClient.lLen(DLQ_NAME);
     res.status(200).json({
       status: "ok",
       checks: {
         redis: "ok",
         database: "ok"
       },
-      queueDepth:0, 
-      dlqDepth:0, 
+      queueDepth,
+      dlqDepth,
       lastJobAt
     });
 

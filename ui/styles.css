@@ -201,6 +201,45 @@ body {
   border-color: var(--accent);
 }
 
+.seat-picker-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.seat-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.seat-option {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.seat-option:hover {
+  background: #eef4ff;
+  border-color: #9eb7df;
+}
+
+.seat-option.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
 .primary-button,
 .ghost-button,
 .card-button,

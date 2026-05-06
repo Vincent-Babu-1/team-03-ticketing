@@ -8,6 +8,7 @@ const purchaseButton = document.getElementById("purchase-button");
 const purchaseResult = document.getElementById("purchase-result");
 const userNameInput = document.getElementById("user-name");
 const sectionSelect = document.getElementById("section-select");
+const seatPicker = document.getElementById("seat-picker");
 const quantityInput = document.getElementById("quantity");
 const cardTokenInput = document.getElementById("card-token");
 
@@ -16,6 +17,7 @@ const PURCHASES_API_URL = "/api/purchases";
 
 let selectedEvent = null;
 let sectionsById = new Map();
+let selectedSeatLabels = [];
 
 function formatDate(dateString) {
   const date = new Date(dateString);
@@ -51,9 +53,13 @@ function seatLabel(seat) {
 function resetSectionState(message = "Select an event to start your purchase.") {
   sectionSelect.innerHTML = '<option value="">Select a section</option>';
   sectionSelect.disabled = true;
+  seatPicker.innerHTML = "";
+  seatPicker.classList.add("hidden");
   sectionSummary.textContent = message;
   sectionSummary.classList.add("hidden");
   sectionsById = new Map();
+  selectedSeatLabels = [];
+  quantityInput.value = "0";
   purchaseButton.disabled = true;
 }
 
@@ -79,6 +85,62 @@ function showResult(kind, html) {
   purchaseResult.className = `result-card ${kind}`;
   purchaseResult.innerHTML = html;
   purchaseResult.classList.remove("hidden");
+}
+
+function syncQuantityFromSeatSelection() {
+  quantityInput.value = String(selectedSeatLabels.length);
+}
+
+function clearSeatSelection() {
+  selectedSeatLabels = [];
+  syncQuantityFromSeatSelection();
+}
+
+function renderSeatPicker(section) {
+  if (!section) {
+    seatPicker.innerHTML = "";
+    seatPicker.classList.add("hidden");
+    return;
+  }
+
+  seatPicker.classList.remove("hidden");
+  seatPicker.innerHTML = "";
+
+  for (const seat of section.availableSeats) {
+    const label = seatLabel(seat);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "seat-option";
+    button.dataset.seatLabel = label;
+    button.textContent = label;
+    button.addEventListener("click", () => {
+      const isSelected = selectedSeatLabels.includes(label);
+
+      if (isSelected) {
+        selectedSeatLabels = selectedSeatLabels.filter((value) => value !== label);
+      } else {
+        if (selectedSeatLabels.length >= 8) {
+          showResult("error", "You can select up to 8 seats in one purchase.");
+          return;
+        }
+
+        selectedSeatLabels = [...selectedSeatLabels, label];
+      }
+
+      syncQuantityFromSeatSelection();
+      renderSeatPicker(section);
+      purchaseResult.classList.add("hidden");
+    });
+
+    if (selectedSeatLabels.includes(label)) {
+      button.classList.add("selected");
+      button.setAttribute("aria-pressed", "true");
+    } else {
+      button.setAttribute("aria-pressed", "false");
+    }
+
+    seatPicker.appendChild(button);
+  }
 }
 
 function renderEvents(events) {
@@ -187,24 +249,24 @@ async function loadSectionsForEvent(eventId) {
 
     sectionSelect.disabled = false;
     purchaseButton.disabled = false;
-    sectionSummary.textContent = "Choose a section. The UI will reserve the first available seats from that section when you submit.";
+    sectionSummary.textContent = "Choose a section, then click the exact seats you want to reserve.";
   } catch (error) {
     sectionSummary.textContent = "Could not load section or seat data for this event.";
   }
 }
 
-function getSelectedSeats(section, quantity) {
-  return section.availableSeats.slice(0, quantity).map(seatLabel);
-}
-
 sectionSelect.addEventListener("change", () => {
   const section = sectionsById.get(sectionSelect.value);
   if (!section) {
-    sectionSummary.textContent = "Choose a section. The UI will reserve the first available seats from that section when you submit.";
+    clearSeatSelection();
+    renderSeatPicker(null);
+    sectionSummary.textContent = "Choose a section, then click the exact seats you want to reserve.";
     return;
   }
 
-  sectionSummary.textContent = `${section.section_name} has ${section.availableSeats.length} available seats. Price for this section is ${formatPrice(section.price)} per seat.`;
+  clearSeatSelection();
+  renderSeatPicker(section);
+  sectionSummary.textContent = `${section.section_name} has ${section.availableSeats.length} available seats. Click the seats you want to buy. Price for this section is ${formatPrice(section.price)} per seat.`;
 });
 
 purchaseForm.addEventListener("submit", async (event) => {
@@ -221,20 +283,14 @@ purchaseForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  const quantity = Number(quantityInput.value);
-  if (!Number.isInteger(quantity) || quantity < 1) {
-    showResult("error", "Enter a valid ticket quantity.");
-    return;
-  }
-
-  if (quantity > selectedSection.availableSeats.length) {
-    showResult("error", `Only ${selectedSection.availableSeats.length} seat(s) are currently available in ${selectedSection.section_name}.`);
+  if (selectedSeatLabels.length === 0) {
+    showResult("error", "Select at least one seat before purchasing.");
     return;
   }
 
   const cardToken = cardTokenInput.value.trim();
   const customerName = userNameInput.value.trim() || "Guest";
-  const seats = getSelectedSeats(selectedSection, quantity);
+  const seats = [...selectedSeatLabels];
 
   purchaseButton.disabled = true;
   purchaseButton.textContent = "Submitting...";
@@ -266,7 +322,7 @@ purchaseForm.addEventListener("submit", async (event) => {
 
     showResult(
       "success",
-      `<strong>Purchase confirmed.</strong><br>
+       `<strong>Purchase confirmed.</strong><br>
        Customer: ${customerName}<br>
        Event: ${selectedEvent.name}<br>
        Section: ${selectedSection.section_name}<br>
