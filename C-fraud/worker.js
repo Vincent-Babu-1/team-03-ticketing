@@ -87,6 +87,7 @@ function runWorker() {
         console.log("Duplicate ignored:", event.purchase_id);
         return setImmediate(loop);
       }
+      processedPurchases.add(event.purchase_id);
       const reason = suspicious_activity(event);
 
       if (reason) {
